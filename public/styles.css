@@ -1,0 +1,62 @@
+/* Zero-chrome: no margins, no scrollbars, full viewport */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #000;
+  font-family: system-ui, sans-serif;
+}
+
+#grid {
+  width: 100vw;
+  height: 100vh;
+  display: grid;
+  gap: 0;
+}
+
+.pane {
+  position: relative;
+  overflow: hidden;
+  background: #111;
+}
+
+/* iframes fill their pane */
+.pane iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* videos fill their pane, cover the area */
+.pane video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* YouTube embeds */
+.pane .youtube-embed {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* Error overlay */
+.pane .pane-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  font-size: 1.2rem;
+  text-align: center;
+  padding: 1rem;
+}

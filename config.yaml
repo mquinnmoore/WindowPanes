@@ -1,0 +1,26 @@
+# WindowPanes Configuration
+# Kitchen portrait display — 1x3 grid
+
+layout:
+  rows: 3
+  columns: 1
+
+panes:
+  - type: video_playlist
+    position: {row: 1, col: 1}
+    videos:
+      - /media/clips/saber_duels/saber_01.mkv
+      - /media/clips/saber_duels/saber_02.mkv
+    loop: true
+    muted: true
+
+  - type: website
+    position: {row: 2, col: 1}
+    url: https://weather.com/local
+
+  - type: rotating_websites
+    position: {row: 3, col: 1}
+    urls:
+      - https://news.ycombinator.com
+      - https://reddit.com/r/starwars
+    interval: 30

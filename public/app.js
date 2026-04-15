@@ -1,0 +1,217 @@
+/**
+ * WindowPanes v1 — Client-side pane renderer
+ *
+ * Fetches config from /api/config and builds the CSS Grid dashboard.
+ * Supports: website, rotating_websites, video, video_playlist, youtube
+ */
+
+(async function () {
+  'use strict';
+
+  const grid = document.getElementById('grid');
+
+  let config;
+  try {
+    const res = await fetch('/api/config');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    config = await res.json();
+  } catch (err) {
+    grid.innerHTML = `<div class="pane"><div class="pane-error">Failed to load config: ${err.message}</div></div>`;
+    return;
+  }
+
+  const { layout, panes } = config;
+  const rows = layout.rows || 1;
+  const cols = layout.columns || 1;
+
+  // Set up CSS Grid
+  grid.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+  grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+
+  // Build each pane
+  for (const pane of panes) {
+    const el = document.createElement('div');
+    el.className = 'pane';
+
+    // Position on grid
+    const row = pane.position?.row || 1;
+    const col = pane.position?.col || 1;
+    el.style.gridRow = row;
+    el.style.gridColumn = col;
+
+    try {
+      switch (pane.type) {
+        case 'website':
+          renderWebsite(el, pane);
+          break;
+        case 'rotating_websites':
+          renderRotatingWebsites(el, pane);
+          break;
+        case 'video':
+          renderVideo(el, pane);
+          break;
+        case 'video_playlist':
+          renderVideoPlaylist(el, pane);
+          break;
+        case 'youtube':
+          renderYouTube(el, pane);
+          break;
+        default:
+          el.innerHTML = `<div class="pane-error">Unknown pane type: ${pane.type}</div>`;
+      }
+    } catch (err) {
+      el.innerHTML = `<div class="pane-error">Error: ${err.message}</div>`;
+    }
+
+    grid.appendChild(el);
+  }
+
+  // ── Pane renderers ──────────────────────────────────────────
+
+  /**
+   * Single website — iframe
+   */
+  function renderWebsite(el, pane) {
+    const iframe = document.createElement('iframe');
+    iframe.src = pane.url;
+    iframe.setAttribute('loading', 'lazy');
+    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups');
+    el.appendChild(iframe);
+  }
+
+  /**
+   * Rotating websites — cycle iframes on a timer
+   */
+  function renderRotatingWebsites(el, pane) {
+    const urls = pane.urls || [];
+    if (urls.length === 0) {
+      el.innerHTML = '<div class="pane-error">No URLs configured</div>';
+      return;
+    }
+
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('loading', 'lazy');
+    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups');
+    el.appendChild(iframe);
+
+    let index = 0;
+    const interval = (pane.interval || 30) * 1000;
+
+    function showNext() {
+      iframe.src = urls[index];
+      index = (index + 1) % urls.length;
+    }
+
+    showNext();
+    setInterval(showNext, interval);
+  }
+
+  /**
+   * Single local video — HTML5 video element
+   */
+  function renderVideo(el, pane) {
+    const video = document.createElement('video');
+    // Convert absolute file path to server media URL
+    video.src = toMediaUrl(pane.src || pane.file);
+    video.autoplay = true;
+    video.muted = pane.muted !== false; // muted by default
+    video.loop = pane.loop !== false;   // loop by default
+    video.playsInline = true;
+    video.setAttribute('preload', 'auto');
+    el.appendChild(video);
+  }
+
+  /**
+   * Video playlist — play multiple videos in sequence, loop the playlist
+   */
+  function renderVideoPlaylist(el, pane) {
+    const videos = pane.videos || [];
+    if (videos.length === 0) {
+      el.innerHTML = '<div class="pane-error">No videos configured</div>';
+      return;
+    }
+
+    const video = document.createElement('video');
+    video.autoplay = true;
+    video.muted = pane.muted !== false;
+    video.playsInline = true;
+    video.setAttribute('preload', 'auto');
+    el.appendChild(video);
+
+    let index = 0;
+    const shouldLoop = pane.loop !== false;
+
+    function playNext() {
+      video.src = toMediaUrl(videos[index]);
+      video.play().catch(() => {}); // autoplay may require muted
+    }
+
+    video.addEventListener('ended', () => {
+      index++;
+      if (index >= videos.length) {
+        if (shouldLoop) {
+          index = 0;
+        } else {
+          return; // done
+        }
+      }
+      playNext();
+    });
+
+    video.addEventListener('error', () => {
+      // Skip broken files
+      console.warn('Video error, skipping:', videos[index]);
+      index++;
+      if (index >= videos.length) index = 0;
+      setTimeout(playNext, 1000);
+    });
+
+    playNext();
+  }
+
+  /**
+   * YouTube / YouTube TV embed
+   */
+  function renderYouTube(el, pane) {
+    const iframe = document.createElement('iframe');
+    iframe.className = 'youtube-embed';
+
+    // Accept a direct embed URL or a video/channel ID
+    let url = pane.url || '';
+    if (!url.includes('youtube.com') && !url.includes('youtu.be')) {
+      // Assume it's a video ID
+      url = `https://www.youtube.com/embed/${url}?autoplay=1&mute=1`;
+    } else if (url.includes('watch?v=')) {
+      // Convert watch URL to embed
+      const videoId = new URL(url).searchParams.get('v');
+      url = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1`;
+    } else if (!url.includes('/embed/')) {
+      // For YouTube TV or other URLs, use as-is in iframe
+    }
+
+    iframe.src = url;
+    iframe.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture');
+    iframe.setAttribute('allowfullscreen', '');
+    el.appendChild(iframe);
+  }
+
+  // ── Helpers ─────────────────────────────────────────────────
+
+  /**
+   * Convert an absolute file path to a /media/... URL.
+   * The server mounts MEDIA_DIR at /media, so we strip the MEDIA_DIR prefix.
+   * If the path already starts with /media/, use as-is.
+   */
+  function toMediaUrl(filePath) {
+    if (!filePath) return '';
+    if (filePath.startsWith('/media/')) {
+      // Already a URL path — use directly
+      return filePath;
+    }
+    // Assume it's an absolute path under the media directory;
+    // the server serves MEDIA_DIR at /media, so just prepend /media
+    // and let the user ensure paths are relative to MEDIA_DIR.
+    return '/media/' + filePath.replace(/^\/+/, '');
+  }
+
+})();
