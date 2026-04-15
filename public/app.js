@@ -81,6 +81,7 @@
 
   /**
    * Rotating websites — cycle iframes on a timer
+   * order: 'sequential' (default) or 'random'
    */
   function renderRotatingWebsites(el, pane) {
     const urls = pane.urls || [];
@@ -94,12 +95,17 @@
     iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups');
     el.appendChild(iframe);
 
-    let index = 0;
+    const isRandom = pane.order === 'random';
+    let index = isRandom ? randomInt(urls.length) : 0;
     const interval = (pane.interval || 30) * 1000;
 
     function showNext() {
       iframe.src = urls[index];
-      index = (index + 1) % urls.length;
+      if (isRandom) {
+        index = randomIntExcluding(urls.length, index);
+      } else {
+        index = (index + 1) % urls.length;
+      }
     }
 
     showNext();
@@ -122,7 +128,8 @@
   }
 
   /**
-   * Video playlist — play multiple videos in sequence, loop the playlist
+   * Video playlist — play multiple videos in sequence or random order
+   * order: 'sequential' (default) or 'random'
    */
   function renderVideoPlaylist(el, pane) {
     const videos = pane.videos || [];
@@ -138,7 +145,8 @@
     video.setAttribute('preload', 'auto');
     el.appendChild(video);
 
-    let index = 0;
+    const isRandom = pane.order === 'random';
+    let index = isRandom ? randomInt(videos.length) : 0;
     const shouldLoop = pane.loop !== false;
 
     function playNext() {
@@ -146,24 +154,29 @@
       video.play().catch(() => {}); // autoplay may require muted
     }
 
-    video.addEventListener('ended', () => {
-      index++;
-      if (index >= videos.length) {
-        if (shouldLoop) {
-          index = 0;
-        } else {
-          return; // done
+    function advance() {
+      if (isRandom) {
+        index = randomIntExcluding(videos.length, index);
+      } else {
+        index++;
+        if (index >= videos.length) {
+          if (shouldLoop) {
+            index = 0;
+          } else {
+            return false; // done
+          }
         }
       }
-      playNext();
+      return true;
+    }
+
+    video.addEventListener('ended', () => {
+      if (advance()) playNext();
     });
 
     video.addEventListener('error', () => {
-      // Skip broken files
       console.warn('Video error, skipping:', videos[index]);
-      index++;
-      if (index >= videos.length) index = 0;
-      setTimeout(playNext, 1000);
+      if (advance()) setTimeout(playNext, 1000);
     });
 
     playNext();
@@ -196,6 +209,26 @@
   }
 
   // ── Helpers ─────────────────────────────────────────────────
+
+  /**
+   * Random int [0, max)
+   */
+  function randomInt(max) {
+    return Math.floor(Math.random() * max);
+  }
+
+  /**
+   * Random int [0, max) excluding a specific value (avoids repeats).
+   * Falls back to same value if max <= 1.
+   */
+  function randomIntExcluding(max, exclude) {
+    if (max <= 1) return 0;
+    let n;
+    do {
+      n = randomInt(max);
+    } while (n === exclude);
+    return n;
+  }
 
   /**
    * Convert an absolute file path to a /media/... URL.

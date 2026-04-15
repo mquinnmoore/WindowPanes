@@ -13,6 +13,7 @@ panes:
       - /media/clips/saber_duels/saber_02.mkv
     loop: true
     muted: true
+    order: random        # 'sequential' (default) or 'random'
 
   - type: website
     position: {row: 2, col: 1}
@@ -24,3 +25,4 @@ panes:
       - https://news.ycombinator.com
       - https://reddit.com/r/starwars
     interval: 30
+    order: sequential    # 'sequential' (default) or 'random'

@@ -51,10 +51,33 @@ panes:
 | Type | Description | Key Fields |
 |------|-------------|------------|
 | `website` | Single website in an iframe | `url` |
-| `rotating_websites` | Cycle through URLs on a timer | `urls`, `interval` (seconds, default 30) |
+| `rotating_websites` | Cycle through URLs on a timer | `urls`, `interval` (seconds, default 30), `order` |
 | `video` | Single local video file | `src` or `file`, `muted`, `loop` |
-| `video_playlist` | Play multiple videos in sequence | `videos`, `loop`, `muted` |
+| `video_playlist` | Play multiple videos in sequence or randomly | `videos`, `loop`, `muted`, `order` |
 | `youtube` | YouTube video or stream embed | `url` (watch URL, embed URL, or video ID) |
+
+#### Playback Order
+
+Both `rotating_websites` and `video_playlist` support an `order` field:
+
+- `sequential` (default) — plays items in the order listed
+- `random` — picks a random next item (never repeats the same item twice in a row)
+
+```yaml
+- type: video_playlist
+  videos: [...]
+  order: random    # shuffle playback
+```
+
+#### YouTube TV
+
+For YouTube TV, use the `website` pane type pointed at `https://tv.youtube.com`. Log in via Firefox on first launch; the session cookie persists across restarts.
+
+```yaml
+- type: website
+  position: {row: 1, col: 1}
+  url: https://tv.youtube.com
+```
 
 ### Layout
 
