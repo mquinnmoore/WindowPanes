@@ -56,6 +56,9 @@
         case 'youtube':
           renderYouTube(el, pane);
           break;
+        case 'novnc':
+          renderNoVNC(el, pane);
+          break;
         default:
           el.innerHTML = `<div class="pane-error">Unknown pane type: ${pane.type}</div>`;
       }
@@ -205,6 +208,35 @@
     iframe.src = url;
     iframe.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture');
     iframe.setAttribute('allowfullscreen', '');
+    el.appendChild(iframe);
+  }
+
+  /**
+   * noVNC remote desktop pane — embeds a noVNC web client pointing at a
+   * local websockify proxy that bridges to a VNC server.
+   *
+   * Required: novnc_url — full URL to the noVNC vnc.html endpoint with
+   *           query params (host, port, autoconnect, password, resize)
+   *
+   * Example config.yaml entry:
+   *   - type: novnc
+   *     novnc_url: "http://localhost:6080/vnc.html?host=localhost&port=6080&autoconnect=true&resize=scale&password=YOURPASSWORD"
+   *
+   * The iframe allows popups + forms so the noVNC toolbar works correctly.
+   * The sandbox deliberately omits allow-same-origin to avoid cross-origin
+   * elevation, but noVNC only needs allow-scripts to function.
+   */
+  function renderNoVNC(el, pane) {
+    if (!pane.novnc_url) {
+      el.innerHTML = '<div class="pane-error">novnc pane requires novnc_url</div>';
+      return;
+    }
+    const iframe = document.createElement('iframe');
+    iframe.src = pane.novnc_url;
+    iframe.setAttribute('loading', 'lazy');
+    // noVNC needs scripts; forms + popups for its toolbar/clipboard support
+    iframe.setAttribute('sandbox', 'allow-scripts allow-forms allow-popups allow-modals');
+    iframe.setAttribute('allow', 'clipboard-read; clipboard-write');
     el.appendChild(iframe);
   }
 

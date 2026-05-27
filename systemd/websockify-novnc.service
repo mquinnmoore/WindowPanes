@@ -1,0 +1,28 @@
+[Unit]
+Description=websockify noVNC proxy for WindowPanes remote desktop pane
+Documentation=https://github.com/novnc/websockify
+After=network.target
+
+[Service]
+# ── Configuration ────────────────────────────────────────────────────────────
+# Edit these two variables to match your setup:
+#   NOVNC_WEB   — path to the noVNC web assets (installed by `apt install novnc`)
+#   VNC_TARGET  — IP and port of the VNC server on the target machine
+Environment="NOVNC_WEB=/usr/share/novnc"
+Environment="VNC_TARGET=192.168.1.X:5900"
+
+# Local port that WindowPanes (the browser) connects to.
+# Must match the port in your config.yaml novnc_url.
+Environment="LISTEN_PORT=6080"
+
+# ── Process ──────────────────────────────────────────────────────────────────
+Type=simple
+ExecStart=/usr/bin/websockify --web ${NOVNC_WEB} ${LISTEN_PORT} ${VNC_TARGET}
+Restart=on-failure
+RestartSec=5s
+
+# Run as the same user that runs WindowPanes (adjust if needed)
+# User=your-username
+
+[Install]
+WantedBy=multi-user.target
