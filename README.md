@@ -2,7 +2,7 @@
 
 A local web server that turns any display into a full-screen, multi-pane dashboard. Configure a grid of panes showing websites, rotating URLs, local videos, video playlists, or YouTube streams — all from a single YAML file.
 
-**First use case:** Kitchen portrait display (1×3 grid) on a Mac Mini running Lubuntu.
+**First use case:** Arkab — Quinn's kitchen Mac Mini running Linux. 1×3 portrait display on the wall.
 
 ## Quick Start
 
@@ -55,6 +55,7 @@ panes:
 | `video` | Single local video file | `src` or `file`, `muted`, `loop` |
 | `video_playlist` | Play multiple videos in sequence or randomly | `videos`, `loop`, `muted`, `order` |
 | `youtube` | YouTube video or stream embed | `url` (watch URL, embed URL, or video ID) |
+| `proxied_website` | Like `website`, but goes through the server-side proxy so it bypasses `X-Frame-Options: DENY` and CSP `frame-ancestors`. For sites that block embedding (weather.com, reddit.com, nytimes.com). | `url` |
 
 #### Playback Order
 
@@ -68,6 +69,42 @@ Both `rotating_websites` and `video_playlist` support an `order` field:
   videos: [...]
   order: random    # shuffle playback
 ```
+
+#### `proxied_website` — When a plain `website` pane won't load
+
+Some sites (`weather.com`, `reddit.com`, `nytimes.com`, many others) send
+`X-Frame-Options: DENY` and/or `Content-Security-Policy: frame-ancestors 'none'`
+to refuse to be embedded in any iframe. Firefox surfaces this as
+*"This content cannot be displayed in a frame."*
+
+`proxied_website` fetches the URL server-side, strips those headers, injects
+a `<base href="…">` so relative URLs still resolve to the upstream origin,
+and serves the result from the same origin as the dashboard. From Firefox's
+point of view, the document is now same-origin as its parent — and the
+removed headers mean the browser has no signal to refuse the frame.
+
+```yaml
+- type: proxied_website
+  position: {row: 2, col: 1}
+  url: https://weather.com/local
+```
+
+**Caveats & expectations:**
+
+- **Heavy SPAs may still render broken.** Reddit, Google, Facebook, etc.
+  detect iframe embedding via runtime `postMessage`/`window.parent` checks,
+  cookies, or referrer-based restrictions. The proxy only defeats the
+  *HTTP-header-level* refusal — script-level checks remain. If a site
+  still blanks out, switch back to the plain `website` pane and accept the
+  error, or open it in a separate browser window.
+- **SSRF guard.** The proxy rejects URLs whose hostname resolves to a
+  private/loopback IP (`127/8`, `10/8`, `172.16/12`, `192.168/16`,
+  `169.254/16`, `::1`, `fc00::/7`, `fe80::/10`). Tailscale's `100.64/10`
+  is allowed. Only `http:` and `https:` are accepted — `file:`, `data:`,
+  `javascript:`, etc. are refused.
+- **Optional allowlist.** Set `PROXY_ALLOWLIST=host1,host2` as an env var
+  to restrict which upstream hostnames are proxied. Default: no allowlist.
+- **Upstream timeout.** 10 s; returns HTTP 504 on overrun.
 
 #### YouTube TV
 
@@ -102,6 +139,7 @@ The server will serve `/mnt/storage/clips/saber_01.mkv`.
 | `PORT` | `3000` | Server port |
 | `CONFIG` | `./config.yaml` | Path to config file |
 | `MEDIA_DIR` | `/media` | Root directory for media files |
+| `PROXY_ALLOWLIST` | _(none)_ | Comma-separated hostnames allowed by `/api/proxy` (e.g. `weather.com,reddit.com`). If unset, anything not blocked by the SSRF guard is allowed. |
 
 ## Running Without Kiosk Mode
 

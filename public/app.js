@@ -59,6 +59,9 @@
         case 'novnc':
           renderNoVNC(el, pane);
           break;
+        case 'proxied_website':
+          renderProxiedWebsite(el, pane);
+          break;
         default:
           el.innerHTML = `<div class="pane-error">Unknown pane type: ${pane.type}</div>`;
       }
@@ -208,6 +211,28 @@
     iframe.src = url;
     iframe.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture');
     iframe.setAttribute('allowfullscreen', '');
+    el.appendChild(iframe);
+  }
+
+  /**
+   * Proxied website — iframe that points at our /api/proxy endpoint,
+   * which fetches the upstream server-side and strips X-Frame-Options /
+   * CSP frame-ancestors. Used for sites like weather.com, reddit.com,
+   * nytimes.com that block embedding otherwise.
+   *
+   * The 'proxied' class lets styles.css draw a small badge so the user
+   * can tell at a glance this pane is going through the proxy.
+   */
+  function renderProxiedWebsite(el, pane) {
+    if (!pane.url) {
+      el.innerHTML = '<div class="pane-error">proxied_website pane requires url</div>';
+      return;
+    }
+    const iframe = document.createElement('iframe');
+    iframe.src = `/api/proxy?url=${encodeURIComponent(pane.url)}`;
+    iframe.setAttribute('loading', 'lazy');
+    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups');
+    el.classList.add('proxied');
     el.appendChild(iframe);
   }
 
