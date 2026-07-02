@@ -8,9 +8,9 @@
 #   Ctrl+C    — full shutdown (in this terminal)
 #
 # Esc/Ctrl+Q require `xdotool` on the X11 display hosting Firefox. If
-# xdotool isn't installed (e.g. macOS dev, headless CI), the watcher is
-# silently skipped — Firefox itself still honors Ctrl+Q on macOS, and
-# Ctrl+C in the terminal always works.
+# xdotool isn't installed (e.g. macOS dev, headless CI), or can't reach
+# the X server, the watcher is silently skipped — Firefox itself still
+# honors Ctrl+Q on macOS, and Ctrl+C in the terminal always works.
 #
 # Usage:
 #   ./start.sh                         # defaults
@@ -70,24 +70,38 @@ cleanup() {
 trap cleanup INT TERM
 
 # Key watcher — Esc and Ctrl+Q trigger a full shutdown.
-# Uses xdotool's `keydown` mode, which blocks until the specified key is
-# pressed anywhere on the X11 display. On Wayland, headless macOS, or any
-# system without xdotool, the watcher is skipped silently (Ctrl+C still
-# works in the terminal, and Ctrl+Q still quits Firefox on macOS).
+# Uses `xdotool waitforkey`, which blocks until the specified key is pressed
+# anywhere on the X11 display. (NOT `xdotool keydown` — that sends a key
+# event and returns immediately; it does not listen.)
+#
+# On Wayland, headless macOS, or any system without xdotool, the watcher
+# is skipped silently. Ctrl+C still works in the terminal, and Firefox
+# itself honors Ctrl+Q on macOS.
 start_key_watcher() {
   if ! command -v xdotool >/dev/null; then
     return
   fi
-  # xdotool keydown needs an X server. On Wayland-only systems, it will
-  # silently fail; bail early with a one-time hint.
+  # xdotool waitforkey needs an X server.
   if [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; then
+    return
+  fi
+
+  # Sanity check: confirm xdotool can actually talk to the X server before
+  # we spawn the watcher, otherwise waitforkey returns instantly and the
+  # script shuts down on startup. (Hit this on 2026-07-02 — the bug was
+  # using `xdotool keydown` instead of `waitforkey`; both reported
+  # instantly and looked identical from the script's perspective.)
+  if ! xdotool getmouselocation --shell >/dev/null 2>&1; then
+    echo "[start.sh] xdotool can't reach the X server; skipping key watcher (use Ctrl+C in this terminal)"
     return
   fi
 
   watch_for() {
     local key="$1"
+    # waitforkey exits 0 when the key is pressed. Loop so a single watcher
+    # can fire multiple shutdowns in a session (e.g. after a config tweak).
     while true; do
-      if xdotool keydown "$key" >/dev/null 2>&1; then
+      if xdotool waitforkey "$key"; then
         echo "[start.sh] $key pressed — shutting down"
         cleanup
         exit 0
