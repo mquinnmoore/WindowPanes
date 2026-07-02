@@ -51,7 +51,7 @@ panes:
 | Type | Description | Key Fields |
 |------|-------------|------------|
 | `website` | Single website in an iframe | `url` |
-| `rotating_websites` | Cycle through URLs on a timer | `urls`, `interval` (seconds, default 30), `order` |
+| `rotating_websites` | Cycle through URLs on a timer | `urls`, `interval` (seconds, default 30), `order`, `proxy` |
 | `video` | Single local video file | `src` or `file`, `muted`, `loop` |
 | `video_playlist` | Play multiple videos in sequence or randomly | `videos`, `loop`, `muted`, `order` |
 | `youtube` | YouTube video or stream embed | `url` (watch URL, embed URL, or video ID) |
@@ -105,6 +105,31 @@ removed headers mean the browser has no signal to refuse the frame.
 - **Optional allowlist.** Set `PROXY_ALLOWLIST=host1,host2` as an env var
   to restrict which upstream hostnames are proxied. Default: no allowlist.
 - **Upstream timeout.** 10 s; returns HTTP 504 on overrun.
+
+#### `rotating_websites` — proxying the whole cycle
+
+If several sites in a `rotating_websites` list block iframes, the `proxy:
+true` flag wraps every URL through the same `/api/proxy` route that
+`proxied_website` uses. Each site in the cycle behaves like a
+`proxied_website` pane; sites that don't need proxying are mixed in via
+URL-level allowlists on the server (or just removed from the list).
+
+```yaml
+- type: rotating_websites
+  position: {row: 3, col: 1}
+  proxy: true
+  urls:
+    - https://weather.com/local
+    - https://www.reddit.com/r/all/
+    - https://trends.google.com/trends/hottrends/visualize
+  interval: 30
+  order: random
+```
+
+The pane gets the same corner badge as `proxied_website` so you can tell
+at a glance which panes are routed through the server. If you'd rather
+mix proxied and direct URLs in the same cycle, split them across two
+panes — there is no per-URL proxy toggle.
 
 #### YouTube TV
 

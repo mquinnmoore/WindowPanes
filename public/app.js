@@ -79,15 +79,18 @@
    */
   function renderWebsite(el, pane) {
     const iframe = document.createElement('iframe');
-    iframe.src = pane.url;
+    iframe.src = resolveSrc(pane, pane.url);
     iframe.setAttribute('loading', 'lazy');
     iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups');
+    if (pane.proxy) el.classList.add('proxied');
     el.appendChild(iframe);
   }
 
   /**
    * Rotating websites — cycle iframes on a timer
    * order: 'sequential' (default) or 'random'
+   * proxy: true (optional) — wrap each URL through the server-side proxy so
+   *   sites that send X-Frame-Options: DENY or CSP frame-ancestors still load
    */
   function renderRotatingWebsites(el, pane) {
     const urls = pane.urls || [];
@@ -99,6 +102,7 @@
     const iframe = document.createElement('iframe');
     iframe.setAttribute('loading', 'lazy');
     iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups');
+    if (pane.proxy) el.classList.add('proxied');
     el.appendChild(iframe);
 
     const isRandom = pane.order === 'random';
@@ -106,7 +110,7 @@
     const interval = (pane.interval || 30) * 1000;
 
     function showNext() {
-      iframe.src = urls[index];
+      iframe.src = resolveSrc(pane, urls[index]);
       if (isRandom) {
         index = randomIntExcluding(urls.length, index);
       } else {
@@ -229,7 +233,7 @@
       return;
     }
     const iframe = document.createElement('iframe');
-    iframe.src = `/api/proxy?url=${encodeURIComponent(pane.url)}`;
+    iframe.src = resolveSrc({ proxy: true }, pane.url);
     iframe.setAttribute('loading', 'lazy');
     iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups');
     el.classList.add('proxied');
@@ -302,6 +306,21 @@
     // the server serves MEDIA_DIR at /media, so just prepend /media
     // and let the user ensure paths are relative to MEDIA_DIR.
     return '/media/' + filePath.replace(/^\/+/, '');
+  }
+
+  /**
+   * Resolve an iframe src URL. If the pane has `proxy: true`, route the
+   * URL through the server-side /api/proxy endpoint (defeats X-Frame-Options
+   * and CSP frame-ancestors). Otherwise returns the URL as-is.
+   *
+   * Returns an empty string for null/undefined URL.
+   */
+  function resolveSrc(pane, url) {
+    if (!url) return '';
+    if (pane && pane.proxy) {
+      return `/api/proxy?url=${encodeURIComponent(url)}`;
+    }
+    return url;
   }
 
 })();

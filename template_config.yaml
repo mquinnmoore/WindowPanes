@@ -56,3 +56,21 @@ panes:
 #  - type: proxied_website
 #    position: {row: 2, col: 1}
 #    url: https://weather.com/local
+
+# ── rotating_websites with proxy ────────────────────────────────────────
+# Same as rotating_websites, but each URL is wrapped through the server-side
+# /api/proxy endpoint so iframe-blocking headers (X-Frame-Options: DENY,
+# CSP frame-ancestors) are stripped before the iframe loads. Use this when
+# you want to cycle through sites that don't normally allow embedding.
+#
+# Then uncomment and adjust the pane below:
+#
+#  - type: rotating_websites
+#    position: {row: 3, col: 1}
+#    proxy: true
+#    urls:
+#      - https://weather.com/local
+#      - https://www.reddit.com/r/all/
+#      - https://trends.google.com/trends/hottrends/visualize
+#    interval: 30
+#    order: random
