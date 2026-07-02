@@ -8,6 +8,7 @@ layout:
 panes:
   - type: rotating_websites
     position: {row: 1, col: 1}
+    proxy: true
     urls:
       - https://www.clockfaceonline.co.uk/clocks/text/
       - https://www.google.com/maps/@42.3032953,-71.0772834,12.2z/data=!5m1!1e1
@@ -16,10 +17,11 @@ panes:
       - https://apod.nasa.gov/apod/
       - https://science.nasa.gov/mission/webb/what-is-webb-observing/#WhatIsWebbObservingTool
     interval: 25
-    order: random
+    order: sequential
 
   - type: rotating_websites
     position: {row: 2, col: 1}
+    proxy: true
     urls:
       - https://forecast.weather.gov/MapClick.php?lat=42.31648500000006&lon=-71.10715999999996#.ZGLYV9LMJB0
       - https://www.star.nesdis.noaa.gov/goes/sector_band.php?sat=G16&sector=eus&band=GEOCOLOR&length=24&dim=1
@@ -32,10 +34,11 @@ panes:
       - https://www.ventusky.com/?p=56.34;-2.79;6&l=feel
       - https://www.ventusky.com/?p=56.34;-2.79;6&l=radar
     interval: 30
-    order: random
+    order: sequential
 
   - type: rotating_websites
     position: {row: 3, col: 1}
+    proxy: true
     urls:
       - http://www.thecolourclock.com/
       - https://news.ycombinator.com
@@ -50,7 +53,7 @@ panes:
       - https://www.espn.com/golf/rankings
       - https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/news
     interval: 35
-    order: random
+    order: sequential
 
 
 ###
