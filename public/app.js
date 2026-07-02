@@ -46,10 +46,10 @@
     try {
       switch (pane.type) {
         case 'website':
-          renderWebsite(el, pane);
+          renderWebsite(el, pane, paneId);
           break;
         case 'rotating_websites':
-          renderRotatingWebsites(el, pane);
+          renderRotatingWebsites(el, pane, paneId);
           break;
         case 'video':
           renderVideo(el, pane);
@@ -64,7 +64,7 @@
           renderNoVNC(el, pane);
           break;
         case 'proxied_website':
-          renderProxiedWebsite(el, pane);
+          renderProxiedWebsite(el, pane, paneId);
           break;
         case 'xscreensaver':
           renderXscreensaver(el, pane, paneId);
@@ -84,9 +84,9 @@
   /**
    * Single website — iframe
    */
-  function renderWebsite(el, pane) {
+  function renderWebsite(el, pane, paneId) {
     const iframe = document.createElement('iframe');
-    iframe.src = resolveSrc(pane, pane.url);
+    iframe.src = resolveSrc(pane, pane.url, paneId);
     iframe.setAttribute('loading', 'lazy');
     iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups');
     if (pane.proxy) el.classList.add('proxied');
@@ -99,7 +99,7 @@
    * proxy: true (optional) — wrap each URL through the server-side proxy so
    *   sites that send X-Frame-Options: DENY or CSP frame-ancestors still load
    */
-  function renderRotatingWebsites(el, pane) {
+  function renderRotatingWebsites(el, pane, paneId) {
     const urls = pane.urls || [];
     if (urls.length === 0) {
       el.innerHTML = '<div class="pane-error">No URLs configured</div>';
@@ -117,7 +117,7 @@
     const interval = (pane.interval || 30) * 1000;
 
     function showNext() {
-      iframe.src = resolveSrc(pane, urls[index]);
+      iframe.src = resolveSrc(pane, urls[index], paneId);
       if (isRandom) {
         index = randomIntExcluding(urls.length, index);
       } else {
@@ -234,13 +234,13 @@
    * The 'proxied' class lets styles.css draw a small badge so the user
    * can tell at a glance this pane is going through the proxy.
    */
-  function renderProxiedWebsite(el, pane) {
+  function renderProxiedWebsite(el, pane, paneId) {
     if (!pane.url) {
       el.innerHTML = '<div class="pane-error">proxied_website pane requires url</div>';
       return;
     }
     const iframe = document.createElement('iframe');
-    iframe.src = resolveSrc({ proxy: true }, pane.url);
+    iframe.src = resolveSrc({ proxy: true }, pane.url, paneId);
     iframe.setAttribute('loading', 'lazy');
     iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups');
     el.classList.add('proxied');
@@ -425,12 +425,31 @@
    * URL through the server-side /api/proxy endpoint (defeats X-Frame-Options
    * and CSP frame-ancestors). Otherwise returns the URL as-is.
    *
+   * When paneId is supplied AND proxy is on, the server-side pane is looked
+   * up by id and any `auth:` block on the pane (Basic / Bearer / Cookie)
+   * is applied to the upstream fetch — including asset subrequests.
+   *
+   * Fragment handling: when proxy is on, the upstream URL's fragment (the
+   * `#anchor` part) is appended to the iframe's own src — NOT encoded into
+   * the `url=` query param. The browser uses the iframe-src fragment to
+   * scroll the loaded document to the matching id/name, which works because
+   * the rewritten HTML preserves all upstream element ids. Without this,
+   * fragments like `#WhatIsWebbObservingTool` are silently dropped and the
+   * iframe always shows the top of the page.
+   *
    * Returns an empty string for null/undefined URL.
    */
-  function resolveSrc(pane, url) {
+  function resolveSrc(pane, url, paneId) {
     if (!url) return '';
     if (pane && pane.proxy) {
-      return `/api/proxy?url=${encodeURIComponent(url)}`;
+      // Split fragment off so it stays on the iframe src (where the browser
+      // honors it for scroll-to-anchor) instead of being %23-encoded into
+      // the upstream URL query.
+      const hashIdx = url.indexOf('#');
+      const baseUrl = hashIdx >= 0 ? url.slice(0, hashIdx) : url;
+      const fragment = hashIdx >= 0 ? url.slice(hashIdx) : '';
+      const idPart = paneId ? `paneId=${encodeURIComponent(paneId)}&` : '';
+      return `/api/proxy?${idPart}url=${encodeURIComponent(baseUrl)}${fragment}`;
     }
     return url;
   }

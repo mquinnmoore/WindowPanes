@@ -155,7 +155,7 @@ function copyHeaders(upstreamHeaders, contentType) {
  *   html     — string body of an HTML document
  *   baseUrl  — absolute URL of the upstream page (e.g. 'https://x.com/foo/bar')
  */
-function rewriteHtml(html, baseUrl) {
+function rewriteHtml(html, baseUrl, opts = {}) {
   const baseOrigin = new URL(baseUrl).origin + '/';
 
   // 1. Inject <base href="<upstream-origin>/"> into <head> so unresolved
@@ -199,6 +199,16 @@ function rewriteHtml(html, baseUrl) {
     } catch {
       return match;
     }
+    // If the caller asked us to route assets through the proxy (because
+    // the pane has auth headers that need to be applied to every request
+    // — Basic / Bearer / Cookie), wrap the absolute URL in the proxy URL.
+    // The browser will then re-fetch through /api/proxy, which applies
+    // auth on the way out. Without this, browser-direct fetches for CSS/JS/
+    // images 401 and the iframe renders blank.
+    if (opts.assetProxyBase) {
+      const q = dq !== undefined ? '"' : (sq !== undefined ? "'" : '"');
+      return `<${tagName}${before} ${attrName}=${q}${opts.assetProxyBase}${encodeURIComponent(abs)}${q}${after}>`;
+    }
     const q = dq !== undefined ? '"' : (sq !== undefined ? "'" : '"');
     return `<${tagName}${before} ${attrName}=${q}${abs}${q}${after}>`;
   });
@@ -206,10 +216,110 @@ function rewriteHtml(html, baseUrl) {
   return out;
 }
 
+// ── Auth resolver for proxied panes ────────────────────────────────────
+// Resolves the `auth:` block on a pane into an HTTP header bag that the
+// proxy can attach to upstream fetches. Supports three shapes:
+//   - basic:   { username, password }  → Authorization: Basic <b64>
+//   - bearer:  <string>                → Authorization: Bearer <token>
+//   - cookie:  <string>                → Cookie: <raw value>
+// Strings containing `${VAR}` are interpolated from process.env at request
+// time so secrets never need to live in config.yaml.
+//
+// Errors out (HTTP 400) on:
+//   - empty/missing required fields
+//   - more than one auth kind per pane (ambiguous)
+//   - `${VAR}` references that aren't set in the environment
+function resolveAuth(pane) {
+  if (!pane || !pane.auth) return null;
+  const auth = pane.auth;
+  if (typeof auth !== 'object') {
+    throw new Error('auth must be an object');
+  }
+  const kinds = [];
+  if (auth.basic) kinds.push('basic');
+  if (auth.bearer != null) kinds.push('bearer');
+  if (auth.cookie != null) kinds.push('cookie');
+  if (kinds.length === 0) {
+    throw new Error('auth block present but no auth method set (use basic:, bearer:, or cookie:)');
+  }
+  if (kinds.length > 1) {
+    throw new Error(`auth block has multiple methods (${kinds.join(', ')}); only one allowed per pane`);
+  }
+
+  const interpolate = (val) => {
+    if (typeof val !== 'string') return val;
+    return val.replace(/\$\{([A-Z_][A-Z0-9_]*)\}/g, (_, name) => {
+      if (process.env[name] === undefined) {
+        throw new Error(`auth references \${${name}} but env var is not set`);
+      }
+      return process.env[name];
+    });
+  };
+
+  if (kinds[0] === 'basic') {
+    if (typeof auth.basic !== 'object' || !auth.basic.username) {
+      throw new Error('auth.basic.username is required');
+    }
+    const user = interpolate(auth.basic.username);
+    const pass = interpolate(auth.basic.password ?? '');
+    const token = Buffer.from(`${user}:${pass}`, 'utf8').toString('base64');
+    return { kind: 'basic', headers: { Authorization: `Basic ${token}` } };
+  }
+  if (kinds[0] === 'bearer') {
+    const token = interpolate(auth.bearer);
+    if (!token) throw new Error('auth.bearer is empty');
+    return { kind: 'bearer', headers: { Authorization: `Bearer ${token}` } };
+  }
+  if (kinds[0] === 'cookie') {
+    const cookie = interpolate(auth.cookie);
+    if (!cookie) throw new Error('auth.cookie is empty');
+    return { kind: 'cookie', headers: { Cookie: cookie } };
+  }
+  // unreachable; for TS-style safety
+  throw new Error(`unknown auth kind: ${kinds[0]}`);
+}
+
+// Look up a pane by its client-side id (`pane-N` where N is the index in
+// config.panes). Returns null if the id is malformed or out of range.
+function lookupPaneById(paneId) {
+  if (!paneId || typeof paneId !== 'string') return null;
+  const m = /^pane-(\d+)$/.exec(paneId);
+  if (!m) return null;
+  const idx = parseInt(m[1], 10);
+  let panes;
+  try {
+    panes = readConfig().panes || [];
+  } catch {
+    return null;
+  }
+  return panes[idx] || null;
+}
+
 app.get('/api/proxy', async (req, res) => {
   const targetUrl = req.query.url;
   if (!targetUrl || typeof targetUrl !== 'string') {
     return res.status(400).send('Missing ?url= parameter');
+  }
+
+  // Optional paneId — when provided, the server looks up that pane's
+  // `auth:` block and applies the resulting headers (Basic/Bearer/Cookie)
+  // to the upstream fetch. When absent, the proxy is anonymous (existing
+  // behavior). Clients should always pass paneId for proxy'd panes so
+  // that asset subrequests pick up auth too.
+  const paneId = req.query.paneId;
+  const pane = paneId ? lookupPaneById(paneId) : null;
+  if (paneId && !pane) {
+    return res.status(400).send(`Proxy: paneId '${paneId}' not found in config`);
+  }
+
+  // Resolve auth (if any) — throws on bad config, missing env vars,
+  // or multiple auth methods set on the same pane.
+  let authHeaders = null;
+  try {
+    const resolved = resolveAuth(pane);
+    if (resolved) authHeaders = resolved.headers;
+  } catch (err) {
+    return res.status(400).send(`Proxy auth error: ${err.message}`);
   }
 
   // Defense-in-depth: SSRF + scheme guard
@@ -234,6 +344,7 @@ app.get('/api/proxy', async (req, res) => {
         'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:124.0) Gecko/20100101 Firefox/124.0',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',
+        ...(authHeaders || {}),
       },
     });
   } catch (err) {
@@ -257,7 +368,14 @@ app.get('/api/proxy', async (req, res) => {
   const headers = copyHeaders(upstream.headers, upstreamCT);
   if (isHtml) {
     let html = buf.toString('utf8');
-    html = rewriteHtml(html, parsed.href);
+    // If auth is set, route asset URLs back through this proxy so the
+    // browser's subrequests for CSS/JS/images pick up auth headers too.
+    // Without this, the HTML renders but static assets 401 and the
+    // iframe looks blank.
+    const rewriteOpts = authHeaders
+      ? { assetProxyBase: paneId ? `/api/proxy?paneId=${paneId}&url=` : `/api/proxy?url=` }
+      : {};
+    html = rewriteHtml(html, parsed.href, rewriteOpts);
     const body = Buffer.from(html, 'utf8');
     headers['Content-Length'] = String(body.length);
     res.writeHead(upstream.status, headers);

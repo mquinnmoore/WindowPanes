@@ -51,12 +51,12 @@ panes:
 | Type | Description | Key Fields |
 |------|-------------|------------|
 | `website` | Single website in an iframe | `url` |
-| `rotating_websites` | Cycle through URLs on a timer | `urls`, `interval` (seconds, default 30), `order`, `proxy` |
+| `rotating_websites` | Cycle through URLs on a timer | `urls`, `interval` (seconds, default 30), `order`, `proxy`, `auth` |
 | `video` | Single local video file | `src` or `file`, `muted`, `loop` |
 | `video_playlist` | Play multiple videos in sequence or randomly | `videos`, `loop`, `muted`, `order` |
 | `youtube` | YouTube video or stream embed | `url` (watch URL, embed URL, or video ID) |
 | `novnc` | noVNC remote-desktop iframe (with `novnc_url`) | `novnc_url` |
-| `proxied_website` | Like `website`, but goes through the server-side proxy so it bypasses `X-Frame-Options: DENY` and CSP `frame-ancestors`. For sites that block embedding (weather.com, reddit.com, nytimes.com). | `url` |
+| `proxied_website` | Like `website`, but goes through the server-side proxy so it bypasses `X-Frame-Options: DENY` and CSP `frame-ancestors`. For sites that block embedding (weather.com, reddit.com, nytimes.com). | `url`, `auth` |
 | `xscreensaver` | Linux-only. Runs an Xvfb display per pane and shows an XScreenSaver module (single module, cycle through a list, or play everything installed). See the dedicated section below. | `mode`, `modules`, `interval`, `width`, `height`, `display` |
 
 #### Playback Order
@@ -132,6 +132,57 @@ The pane gets the same corner badge as `proxied_website` so you can tell
 at a glance which panes are routed through the server. If you'd rather
 mix proxied and direct URLs in the same cycle, split them across two
 panes — there is no per-URL proxy toggle.
+
+#### Authentication on proxied panes
+
+Proxied panes can carry credentials via an `auth:` block. One method per
+pane — setting more than one is rejected at startup as ambiguous.
+
+```yaml
+- type: proxied_website
+  position: {row: 4, col: 1}
+  url: https://hub.example.com/
+  auth:
+    basic:
+      username: ${BESZEL_USER}
+      password: ${BESZEL_PASSWORD}
+```
+
+Three shapes:
+
+| `auth:` key | Upstream header | YAML shape |
+|---|---|---|
+| `basic:` | `Authorization: Basic <b64>` | `{ username, password }` |
+| `bearer:` | `Authorization: Bearer <token>` | string |
+| `cookie:` | `Cookie: <raw value>` | string |
+
+Secrets are interpolated from `process.env` at request time using
+`${VAR_NAME}` syntax — so the actual username/password/token never lives
+in `config.yaml`. If a referenced env var is unset the server responds
+with HTTP 400 and a descriptive message instead of silently sending an
+empty header.
+
+When auth is set, the proxy also rewrites asset URLs in the returned
+HTML (CSS / JS / images) back through `/api/proxy?paneId=N&url=…` so
+the browser's secondary requests for static assets pick up the same
+auth headers. Without this, the HTML loads but every image and
+stylesheet 401s, leaving an unstyled blank iframe.
+
+#### URL fragments on proxied URLs
+
+Deep links like `https://example.com/page/#section` work on proxied
+panes — the fragment is preserved on the iframe's own `src` (where the
+browser uses it for scroll-to-anchor) instead of being `%23`-encoded
+into the upstream URL. The rewritten document keeps the upstream
+element ids, so the iframe loads and scrolls to the matching section
+in one step.
+
+If the target page hydrates its anchor content via JavaScript (a tab
+interface that only mounts after a few hundred milliseconds), the
+browser-native scroll may fire before the element exists. In that case
+the iframe still loads at the top — log an issue and we'll add a
+small `<script>` snippet + `MutationObserver` to handle the late-mount
+case.
 
 #### YouTube TV
 

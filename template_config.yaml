@@ -130,3 +130,36 @@ panes:
 #    mode: all-sequential
 #    interval: 45
 
+
+# ── Authentication on proxied panes ──────────────────────────────────────
+# proxied_website panes (and `proxy: true` website / rotating_websites)
+# support three auth shapes via the `auth:` block. Use one method per pane;
+# setting more than one is rejected at startup as ambiguous. For secrets,
+# interpolate from process.env with ${VAR_NAME} so they never live in
+# config.yaml.
+#
+#   - type: proxied_website
+#     url: https://hub.example.com/
+#     auth:
+#       basic:                              # HTTP Basic Auth
+#         username: ${BESZEL_USER}
+#         password: ${BESZEL_PASSWORD}
+#
+#   - type: proxied_website
+#     url: https://api.example.com/dashboard
+#     auth:
+#       bearer: ${API_TOKEN}               # Authorization: Bearer <token>
+#
+#   - type: proxied_website
+#     url: https://internal.example.com/
+#     auth:
+#       cookie: "session=abcdef1234567890"  # raw Cookie header value
+#
+# When auth is set, the proxy also routes asset subrequests (CSS/JS/images)
+# back through /api/proxy so the browser's fetches pick up auth too.
+# Without that, the HTML loads but static assets 401 and the iframe blanks.
+#
+# URL fragments (#anchor) on proxied URLs are preserved and passed through
+# to the iframe, so deep links scroll to the matching element in the
+# rewritten document (works for most pages; pages that load anchors via
+# client-side hydration may need a follow-up scroll-snippet).
