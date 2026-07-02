@@ -1,0 +1,46 @@
+# WindowPanes Configuration
+# Kitchen portrait display — 1x3 grid
+
+layout:
+  rows: 3
+  columns: 1
+
+panes:
+  - type: video_playlist
+    position: {row: 1, col: 1}
+    videos:
+      - /media/clips/saber_duels/saber_01.mkv
+      - /media/clips/saber_duels/saber_02.mkv
+    loop: true
+    muted: true
+    order: random        # 'sequential' (default) or 'random'
+
+  - type: website
+    position: {row: 2, col: 1}
+    url: https://weather.com/local
+
+  - type: rotating_websites
+    position: {row: 3, col: 1}
+    urls:
+      - https://news.ycombinator.com
+      - https://reddit.com/r/starwars
+    interval: 30
+    order: sequential    # 'sequential' (default) or 'random'
+
+# ── noVNC example ───────────────────────────────────────────────────────────
+# To show a remote desktop pane, add a pane like this and run websockify
+# on the WindowPanes machine pointing at the target machine's VNC port.
+#
+# Prerequisites:
+#   1. Enable Screen Sharing on the target Mac Mini
+#      (System Settings → General → Sharing → Screen Sharing, VNC on port 5900)
+#   2. Install noVNC + websockify on this machine:
+#      sudo apt install novnc websockify
+#   3. Start the proxy (or use the provided systemd service):
+#      websockify --web /usr/share/novnc 6080 <MAC_MINI_IP>:5900
+#
+# Then uncomment and adjust the pane below:
+#
+#  - type: novnc
+#    position: {row: 1, col: 1}
+#    novnc_url: "http://localhost:6080/vnc.html?host=localhost&port=6080&autoconnect=true&resize=scale&password=YOURPASSWORD"

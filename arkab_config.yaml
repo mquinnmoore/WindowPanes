@@ -1,0 +1,101 @@
+# WindowPanes Configuration
+# Arkab portrait display — 1x3 grid
+
+layout:
+  rows: 3
+  columns: 1
+
+panes:
+  - type: rotating_websites
+    position: {row: 1, col: 1}
+    urls:
+      - https://www.clockfaceonline.co.uk/clocks/text/
+      - https://www.google.com/maps/@42.3032953,-71.0772834,12.2z/data=!5m1!1e1
+      - https://www.airnavradar.com/@42.31660,-71.10656,z10?ground=false
+      - https://trends.google.com/trends/hottrends/visualize?nrow=5&ncol=5
+      - https://apod.nasa.gov/apod/
+      - https://science.nasa.gov/mission/webb/what-is-webb-observing/#WhatIsWebbObservingTool
+    interval: 25
+    order: random
+
+  - type: rotating_websites
+    position: {row: 2, col: 1}
+    urls:
+      - https://forecast.weather.gov/MapClick.php?lat=42.31648500000006&lon=-71.10715999999996#.ZGLYV9LMJB0
+      - https://www.star.nesdis.noaa.gov/goes/sector_band.php?sat=G16&sector=eus&band=GEOCOLOR&length=24&dim=1
+      - https://www.windy.com/-Weather-radar-radar?radar,42.876,-71.548,7
+      - https://www.ventusky.com/?p=42.36;-71.06;6&l=feel
+      - https://www.ventusky.com/?p=42.36;-71.06;6&l=radar
+      - https://www.airnow.gov/?city=Jamaica%20Plain&state=MA&country=USA
+      - https://www.spaceweatherlive.com/en/solar-activity.html
+      - https://www.windy.com/-Weather-radar-radar?radar,55.985,-2.796,8
+      - https://www.ventusky.com/?p=56.34;-2.79;6&l=feel
+      - https://www.ventusky.com/?p=56.34;-2.79;6&l=radar
+    interval: 30
+    order: random
+
+  - type: rotating_websites
+    position: {row: 3, col: 1}
+    urls:
+      - http://www.thecolourclock.com/
+      - https://news.ycombinator.com
+      - https://finance.yahoo.com/world-indices/
+      - https://www.npr.org/
+      - https://www.wgbh.org/news
+      - https://jamaicaplaingazette.com/
+      - https://www.scotsman.com/
+      - https://newsmap.ijmacd.com/?edition=US_en
+      - https://www.mlb.com/standings/
+      - https://www.bbc.com/sport/golf/uspga-tour/leaderboard
+      - https://www.espn.com/golf/rankings
+      - https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/news
+    interval: 35
+    order: random
+
+
+###
+#
+# OG configuration here for reference
+#
+# panes:
+#   - type: video_playlist
+#     position: {row: 1, col: 1}
+#     videos:
+#       - /media/clips/saber_duels/saber_01.mkv
+#       - /media/clips/saber_duels/saber_02.mkv
+#     loop: true
+#     muted: true
+#     order: random        # 'sequential' (default) or 'random'
+# 
+#   - type: website
+#     position: {row: 2, col: 1}
+#     url: https://weather.com/local
+# 
+#   - type: rotating_websites
+#     position: {row: 3, col: 1}
+#     urls:
+#       - https://news.ycombinator.com
+#       - https://reddit.com/r/starwars
+#     interval: 30
+#     order: sequential    # 'sequential' (default) or 'random'
+#
+#
+###
+
+# ── noVNC example ───────────────────────────────────────────────────────────
+# To show a remote desktop pane, add a pane like this and run websockify
+# on the WindowPanes machine pointing at the target machine's VNC port.
+#
+# Prerequisites:
+#   1. Enable Screen Sharing on the target Mac Mini
+#      (System Settings → General → Sharing → Screen Sharing, VNC on port 5900)
+#   2. Install noVNC + websockify on this machine:
+#      sudo apt install novnc websockify
+#   3. Start the proxy (or use the provided systemd service):
+#      websockify --web /usr/share/novnc 6080 <MAC_MINI_IP>:5900
+#
+# Then uncomment and adjust the pane below:
+#
+#  - type: novnc
+#    position: {row: 1, col: 1}
+#    novnc_url: "http://localhost:6080/vnc.html?host=localhost&port=6080&autoconnect=true&resize=scale&password=YOURPASSWORD"
