@@ -10,12 +10,14 @@ panes:
     position: {row: 1, col: 1}
     proxy: true
     urls:
-      - https://www.clockfaceonline.co.uk/clocks/text/
-      - https://www.google.com/maps/@42.3032953,-71.0772834,12.2z/data=!5m1!1e1
+      - http://kausaustralis.tailedb590.ts.net:8090
+      - https://www.google.com/maps/@41.7268983,-70.3509357,11z/data=!5m1!1e1?entry=ttu&g_ep=EgoyMDI2MDYyOS4wIKXMDSoASAFQAw%3D%3D
+      - https://www.google.com/maps/@42.0906689,-70.9852742,10z/data=!5m1!1e1?entry=ttu&g_ep=EgoyMDI2MDYyOS4wIKXMDSoASAFQAw%3D%3D
       - https://www.airnavradar.com/@42.31660,-71.10656,z10?ground=false
       - https://trends.google.com/trends/hottrends/visualize?nrow=5&ncol=5
       - https://apod.nasa.gov/apod/
       - https://science.nasa.gov/mission/webb/what-is-webb-observing/#WhatIsWebbObservingTool
+      - https://www.clockfaceonline.co.uk/clocks/text/
     interval: 25
     order: sequential
 
@@ -40,7 +42,6 @@ panes:
     position: {row: 3, col: 1}
     proxy: true
     urls:
-      - http://www.thecolourclock.com/
       - https://news.ycombinator.com
       - https://finance.yahoo.com/world-indices/
       - https://www.npr.org/
@@ -52,6 +53,7 @@ panes:
       - https://www.bbc.com/sport/golf/uspga-tour/leaderboard
       - https://www.espn.com/golf/rankings
       - https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/news
+      - http://www.thecolourclock.com/
     interval: 35
     order: sequential
 
