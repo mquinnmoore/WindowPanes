@@ -44,5 +44,6 @@
 **Do not start until Quinn gives the go-ahead.** He explicitly said "let's try the proxy fix first" on 2026-07-02.
 
 ## Done
+- 2026-07-02 — `xscreensaver` pane type added: 5 modes (single, list-sequential, list-random, all-sequential, all-random). Xvfb-per-pane, ffmpeg x11grab capture to JPEG at 250 ms, server endpoint `/api/screensaver/<id>.jpg`, client renderer with cache-busting poll + 3-strike error overlay. Pure-logic helpers in `xscreensaver-logic.js`, tested via `node test-xscreensaver-logic.js` (49 assertions, all passing). SIGTERM cleans up child Xvfb + screensaver + ffmpeg processes. Local, uncommitted.
 - 2026-07-02 — `start.sh` Esc/Ctrl+Q full shutdown hotkeys (local, uncommitted). xdotool-based key watcher, graceful no-op if xdotool not installed.
 - 2026-05-27 — Added `novnc` pane type + systemd unit + setup doc (pushed to mquinnmoore/WindowPanes)

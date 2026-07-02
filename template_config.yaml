@@ -74,3 +74,59 @@ panes:
 #      - https://trends.google.com/trends/hottrends/visualize
 #    interval: 30
 #    order: random
+
+# ── xscreensaver pane (Linux + Xvfb required) ────────────────────────
+# Mimics XScreenSaver inside a WindowPanes pane. Each pane allocates its
+# own Xvfb display (default starting at :99) and serves a polled JPEG of
+# the running screensaver at /api/screensaver/<pane-id>.jpg.
+#
+# Requirements on the host (apt names):
+#   xvfb, ffmpeg, xscreensaver (for the daemon + modules), x11-apps (for
+#   the modules to draw). On Debian/Ubuntu:
+#     sudo apt install xvfb ffmpeg xscreensaver xscreensaver-data-extra xscreensaver-gl x11-apps
+#
+# Modes:
+#   single           — run one named module forever
+#   list-sequential  — cycle modules list in order, looping
+#   list-random      — pick from modules list, never repeating immediately
+#   all-sequential   — enumerate *installed* modules; cycle in order
+#   all-random       — enumerate *installed* modules; random, no repeats
+#
+# Then uncomment and adjust any of the panes below:
+#
+#  - type: xscreensaver                  # single mode — runs Qix forever
+#    position: {row: 1, col: 1}
+#    mode: single
+#    modules: [Qix]
+#    interval: 30                         # ignored in 'single'
+#    width: 1280
+#    height: 720
+#    display: 99                         # Xvfb display number (auto-incremented)
+#
+#  - type: xscreensaver                  # list-random — shuffle a fixed set
+#    position: {row: 2, col: 1}
+#    mode: list-random
+#    modules:
+#      - GLMatrix
+#      - Decays
+#      - Qix
+#      - Flurry
+#      - Carousel
+#    interval: 45                         # seconds per module before swapping
+#
+#  - type: xscreensaver                  # list-sequential — fixed cycle
+#    position: {row: 3, col: 1}
+#    mode: list-sequential
+#    modules: [Qix, GLMatrix, Decays]
+#    interval: 60
+#
+#  - type: xscreensaver                  # all-random — play everything installed
+#    position: {row: 1, col: 1}
+#    mode: all-random
+#    interval: 30                         # modules list auto-enumerated at boot
+#
+#  - type: xscreensaver                  # all-sequential — walk everything installed
+#    position: {row: 2, col: 1}
+#    mode: all-sequential
+#    interval: 45
+

@@ -29,7 +29,7 @@
   grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
 
   // Build each pane
-  for (const pane of panes) {
+  for (const [i, pane] of panes.entries()) {
     const el = document.createElement('div');
     el.className = 'pane';
 
@@ -38,6 +38,10 @@
     const col = pane.position?.col || 1;
     el.style.gridRow = row;
     el.style.gridColumn = col;
+
+    // Stable id — server uses the same scheme (`pane-${i}` keyed by index
+    // in config.panes). Used for /api/screensaver/<id>.jpg lookups.
+    const paneId = `pane-${i}`;
 
     try {
       switch (pane.type) {
@@ -61,6 +65,9 @@
           break;
         case 'proxied_website':
           renderProxiedWebsite(el, pane);
+          break;
+        case 'xscreensaver':
+          renderXscreensaver(el, pane, paneId);
           break;
         default:
           el.innerHTML = `<div class="pane-error">Unknown pane type: ${pane.type}</div>`;
@@ -267,6 +274,111 @@
     iframe.setAttribute('sandbox', 'allow-scripts allow-forms allow-popups allow-modals');
     iframe.setAttribute('allow', 'clipboard-read; clipboard-write');
     el.appendChild(iframe);
+  }
+
+  /**
+   * xscreensaver pane — renders an <img> that polls the server-side
+   * screensaver frame endpoint at ~250ms. The server (server.js) runs an
+   * Xvfb per pane, spawns a screensaver module into it, and continuously
+   * captures the framebuffer to JPEG. We just refresh the <img> src with
+   * a cache-busting query string.
+   *
+   * paneId is the server-side id assigned by index in config.panes
+   * (`pane-N`), which the server uses to identify the running Xvfb.
+   *
+   * Error handling:
+   *   - Initial fetch probes the endpoint; if the server returns 503 with a
+   *     structured JSON error body (e.g. `{reason: 'ffmpeg-missing'}`) we
+   *     surface that reason to the user via the `.pane-error` overlay and
+   *     stop polling.
+   *   - After the initial probe succeeds, the <img> polling path takes
+   *     over. If frames go bad later (Xvfb died, display unreachable),
+   *     3 consecutive <img> errors switch the pane to the error overlay.
+   */
+  function renderXscreensaver(el, pane, paneId) {
+    if (!paneId) {
+      el.innerHTML = '<div class="pane-error">xscreensaver pane missing paneId</div>';
+      return;
+    }
+
+    let consecutiveErrors = 0;
+    let stopped = false;
+    const ERROR_THRESHOLD = 3;
+    const POLL_MS = 250;
+
+    function showError(msg) {
+      stopped = true;
+      while (el.firstChild) el.removeChild(el.firstChild);
+      const err = document.createElement('div');
+      err.className = 'pane-error';
+      err.textContent = msg;
+      el.appendChild(err);
+    }
+
+    function startPolling() {
+      const img = document.createElement('img');
+      img.className = 'screensaver-frame';
+      img.alt = '';
+      el.appendChild(img);
+
+      img.addEventListener('load', () => {
+        consecutiveErrors = 0;
+      });
+      img.addEventListener('error', () => {
+        consecutiveErrors++;
+        if (consecutiveErrors >= ERROR_THRESHOLD) {
+          showError(`xscreensaver pane unavailable (${consecutiveErrors} failed loads)`);
+        }
+      });
+
+      function refresh() {
+        if (stopped) return;
+        img.src = `/api/screensaver/${paneId}.jpg?t=${Date.now()}`;
+      }
+      refresh();
+      setInterval(refresh, POLL_MS);
+    }
+
+    // Map server-side reason codes to user-facing messages. Keep these
+    // short — they're rendered in a tight pane slot.
+    const REASON_HUMAN = {
+      // missing-deps
+      'xvfb-missing':         'XScreenSaver: xvfb not installed — `sudo apt install xvfb`',
+      'ffmpeg-missing':       'XScreenSaver: ffmpeg not installed — `sudo apt install ffmpeg`',
+      'xscreensaver-missing': 'XScreenSaver: xscreensaver not installed — `sudo apt install xscreensaver xscreensaver-data xscreensaver-gl`',
+      // xvfb lifecycle
+      'xvfb-spawn-failed':    'XScreenSaver: failed to start Xvfb (check display number)',
+      'xvfb-not-ready':       'XScreenSaver: Xvfb did not become ready in time',
+      'xvfb-died':            'XScreenSaver: Xvfb display died',
+      // config issues
+      'invalid-mode':         'XScreenSaver: invalid `mode` (use: single, list-sequential, list-random, all-sequential, all-random)',
+      'empty-modules':        'XScreenSaver: no modules configured (set `modules:` for single or list-* modes)',
+      'no-installed-modules': 'XScreenSaver: no installed XScreenSaver modules found (apt install xscreensaver-data xscreensaver-gl)',
+      // transient
+      'frame-not-ready':      'XScreenSaver: capturing first frame…',
+    };
+
+    // Initial probe — gives us the JSON error body so we can render a
+    // useful message instead of just "unavailable".
+    fetch(`/api/screensaver/${paneId}.jpg`)
+      .then((res) => {
+        if (res.ok) {
+          startPolling();
+          return;
+        }
+        // Try to parse the JSON error body for a specific reason.
+        res.json().then((body) => {
+          const reason = (body && body.reason) || 'unknown';
+          const human = REASON_HUMAN[reason] || `XScreenSaver: pane disabled (reason: ${reason})`;
+          showError(human);
+        }).catch(() => {
+          showError(`XScreenSaver: pane disabled (HTTP ${res.status})`);
+        });
+      })
+      .catch(() => {
+        // Network error — fall back to img polling and let its error handler deal with it
+        startPolling();
+      });
   }
 
   // ── Helpers ─────────────────────────────────────────────────

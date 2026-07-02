@@ -48,6 +48,17 @@ html, body {
   border: none;
 }
 
+/* xscreensaver frame — fills the pane with object-fit:cover so non-16:9
+   captures don't letterbox awkwardly. The src updates via cache-buster
+   every 250ms; let the browser handle layout. */
+.pane img.screensaver-frame {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  background: #000;
+}
+
 /* Proxied-pane marker — a tiny corner badge so the user can tell at a glance
    which pane is going through /api/proxy. Pure CSS, no DOM injection. */
 .pane.proxied::after {
