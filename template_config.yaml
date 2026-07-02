@@ -44,3 +44,15 @@ panes:
 #  - type: novnc
 #    position: {row: 1, col: 1}
 #    novnc_url: "http://localhost:6080/vnc.html?host=localhost&port=6080&autoconnect=true&resize=scale&password=YOURPASSWORD"
+
+# ── proxied_website example ─────────────────────────────────────────────
+# Use for sites that send X-Frame-Options: DENY or CSP frame-ancestors
+# (e.g. weather.com, reddit.com, nytimes.com) — the server fetches them
+# server-side and strips those headers. The iframe loads the proxied URL
+# from the same origin as the dashboard, so framing is allowed.
+#
+# Then uncomment and adjust the pane below:
+#
+#  - type: proxied_website
+#    position: {row: 2, col: 1}
+#    url: https://weather.com/local
