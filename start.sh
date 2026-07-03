@@ -42,10 +42,15 @@ echo "Opening Firefox kiosk at $URL"
 
 FIREFOX_PID=""
 if command -v firefox &>/dev/null; then
-  firefox --kiosk "$URL" &
+  # --new-instance forces a fresh Firefox process even when the default
+  # profile is already in use by another running Firefox session. Without
+  # it, `firefox --kiosk $URL` hands the URL to the running instance,
+  # which loads it as a regular tab in that window instead of opening a
+  # kiosk on the display.
+  firefox --kiosk --new-instance "$URL" &
   FIREFOX_PID=$!
 elif command -v firefox-esr &>/dev/null; then
-  firefox-esr --kiosk "$URL" &
+  firefox-esr --kiosk --new-instance "$URL" &
   FIREFOX_PID=$!
 else
   echo "Firefox not found. Open $URL manually in a browser."
