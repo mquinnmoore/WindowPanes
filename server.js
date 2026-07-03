@@ -181,6 +181,17 @@ function rewriteHtml(html, baseUrl, opts = {}) {
   //    BEFORE injecting <base> would lose the base reference, so we do it
   //    after — but the <base> target is referenced via origin only, so our
   //    pass below uses baseUrl as the resolution root.
+  //
+  //    Special case: <iframe src="..."> absolute URLs are wrapped through the
+  //    proxy when the caller opts in (opts.wrapIframes). Otherwise the
+  //    browser fetches the inner frame directly from upstream — which has
+  //    the same X-Frame-Options / CSP frame-ancestors problem we routed
+  //    around at the top level. The result is that nested iframes (the
+  //    common "third-party embed" pattern: NASA page → spacetelescopelive.org
+  //    iframe) render the upstream "you cannot be framed" error instead
+  //    of the embedded content. CSS/JS/images/fonts are NOT wrapped —
+  //    frame-ancestors only affects top-level document navigation, not
+  //    subresource loads.
   const ATTRS = ['href', 'src'];
   const reTag = new RegExp(
     `<(\\w+)([^>]*?)\\s(${ATTRS.join('|')})=("([^"]*)"|'([^']*)'|([^\\s"'>]+))([^>]*)>`,
@@ -189,10 +200,26 @@ function rewriteHtml(html, baseUrl, opts = {}) {
   out = out.replace(reTag, (match, tagName, before, attrName, _q, dq, sq, unq, after) => {
     const raw = dq !== undefined ? dq : (sq !== undefined ? sq : (unq || ''));
     if (!raw) return match;
-    // Skip absolute URLs, protocol-relative, anchors, inlines, mailto, etc.
-    if (/^(https?:)?\/\//i.test(raw)) return match;
     if (raw.startsWith('#')) return match;          // anchors stay relative
     if (/^(data:|javascript:|mailto:|tel:)/i.test(raw)) return match;
+    const isAbsolute = /^(https?:)?\/\//i.test(raw);
+    const isIframeSrc = tagName.toLowerCase() === 'iframe' && attrName.toLowerCase() === 'src';
+
+    // For iframe src absolute URLs, the browser-direct fetch would hit the
+    // upstream's frame-ancestors restrictions and refuse to render. Wrap
+    // the URL through the proxy (when opted in) so the inner page is
+    // fetched server-side, frame-ancestors stripped, and served from our
+    // origin — which the browser allows because we set frame-ancestors *
+    // on proxied responses.
+    if (isAbsolute && isIframeSrc && opts.wrapIframes && opts.proxyBase) {
+      const abs = (() => { try { return new URL(raw, baseUrl).href; } catch { return raw; } })();
+      const q = dq !== undefined ? '"' : (sq !== undefined ? "'" : '"');
+      return `<${tagName}${before} ${attrName}=${q}${opts.proxyBase}${encodeURIComponent(abs)}${q}${after}>`;
+    }
+
+    // Skip other absolute URLs (CSS/JS/images that resolve to upstream).
+    if (isAbsolute) return match;
+
     let abs;
     try {
       abs = new URL(raw, baseUrl).href;
@@ -368,13 +395,17 @@ app.get('/api/proxy', async (req, res) => {
   const headers = copyHeaders(upstream.headers, upstreamCT);
   if (isHtml) {
     let html = buf.toString('utf8');
-    // If auth is set, route asset URLs back through this proxy so the
-    // browser's subrequests for CSS/JS/images pick up auth headers too.
-    // Without this, the HTML renders but static assets 401 and the
-    // iframe looks blank.
+    // Build proxy-base options for HTML rewrites:
+    //   - Always wrap nested <iframe src="..."> URLs through the proxy, so
+    //     upstream X-Frame-Options / CSP frame-ancestors can't block the
+    //     inner frame from rendering (the whole reason this proxy exists
+    //     also applies recursively to embedded third-party iframes).
+    //   - When auth is set, also wrap CSS/JS/image URLs so the browser's
+    //     subrequests pick up the credential headers.
+    const proxyBase = paneId ? `/api/proxy?paneId=${encodeURIComponent(paneId)}&url=` : '/api/proxy?url=';
     const rewriteOpts = authHeaders
-      ? { assetProxyBase: paneId ? `/api/proxy?paneId=${paneId}&url=` : `/api/proxy?url=` }
-      : {};
+      ? { proxyBase, assetProxyBase: proxyBase, wrapIframes: true }
+      : { proxyBase, wrapIframes: true };
     html = rewriteHtml(html, parsed.href, rewriteOpts);
     const body = Buffer.from(html, 'utf8');
     headers['Content-Length'] = String(body.length);
