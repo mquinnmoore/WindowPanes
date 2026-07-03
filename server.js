@@ -140,10 +140,15 @@ function copyHeaders(upstreamHeaders, contentType) {
     out[key] = value;
   }
   if (contentType) out['Content-Type'] = contentType;
-  // Belt-and-suspenders for HTML: explicit allow header too
+  // For HTML responses we need a permissive framing policy. We use CSP
+  // frame-ancestors exclusively — it's the more expressive / standards-
+  // compliant mechanism and overrides X-Frame-Options when both are set.
+  // We deliberately do NOT emit an X-Frame-Options header: emitting
+  // 'ALLOWALL' (a non-standard value) has historically been interpreted
+  // inconsistently by Firefox, sometimes triggering the same framing
+  // block we're trying to defeat. Setting only frame-ancestors keeps
+  // behavior consistent across Chromium and Firefox.
   if (contentType && /^text\/html/i.test(contentType)) {
-    out['X-Frame-Options'] = 'ALLOWALL';
-    // Disable any leftover frame-ancestors via CSP too (defense in depth)
     out['Content-Security-Policy'] = "frame-ancestors *";
   }
   return out;
