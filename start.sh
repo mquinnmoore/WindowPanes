@@ -185,7 +185,7 @@ start_key_watcher() {
   # Check for it before spawning watchers; fall back silently if absent.
   if ! xdotool waitforkey --help >/dev/null 2>&1 && \
      ! xdotool help 2>&1 | grep -q 'waitforkey'; then
-    echo "[start.sh] xdotool installed but 'waitforkey' not available (xdotool $(xdotool version 2>/dev/null || echo '?')); skipping key watcher (use Ctrl+C in this terminal)"
+    echo "[start.sh] xdotool installed but 'waitforkey' not available ($(xdotool version 2>/dev/null || echo 'unknown version')); skipping key watcher (use Ctrl+C in this terminal)"
     return
   fi
 
