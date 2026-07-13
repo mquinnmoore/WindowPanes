@@ -1,0 +1,127 @@
+# WindowPanes Configuration
+# KausAustralis TV — 3x4 grid
+
+layout:
+  rows: 3
+  columns: 4
+
+panes:
+  - type: rotating_websites
+    position: {row: 1, col: 1}
+    proxy: true
+    urls:
+      - https://www.google.com/maps/@41.7268983,-70.3509357,11z/data=!5m1!1e1?entry=ttu&g_ep=EgoyMDI2MDYyOS4wIKXMDSoASAFQAw%3D%3D
+      - https://www.google.com/maps/@42.0906689,-70.9852742,10z/data=!5m1!1e1?entry=ttu&g_ep=EgoyMDI2MDYyOS4wIKXMDSoASAFQAw%3D%3D
+      - https://www.airnavradar.com/@42.31660,-71.10656,z10?ground=false
+      - https://www.star.nesdis.noaa.gov/goes/sector_band.php?sat=G16&sector=eus&band=GEOCOLOR&length=24&dim=1
+      - https://newsmap.ijmacd.com/?edition=US_en
+      - https://www.mlb.com/standings/
+    interval: 20
+    order: sequential
+
+  - type: rotating_websites
+    position: {row: 1, col: 2}
+    proxy: true
+    urls:
+      - https://www.ventusky.com/?p=42.36;-71.06;6&l=feel
+      - https://www.ventusky.com/?p=42.36;-71.06;6&l=radar
+    interval: 10
+    order: sequential
+
+  - type: rotating_websites
+    position: {row: 1, col: 3}
+    proxy: true
+    urls:
+      - https://www.airnow.gov/?city=Jamaica%20Plain&state=MA&country=USA
+      - https://www.spaceweatherlive.com/en/solar-activity.html
+    interval: 16
+    order: sequential
+
+  - type: rotating_websites
+    position: {row: 1, col: 4}
+    proxy: true
+    urls:
+      - https://www.npr.org/
+      - https://www.wgbh.org/news
+      - https://forecast.weather.gov/MapClick.php?lat=42.31648500000006&lon=-71.10715999999996#.ZGLYV9LMJB0
+    interval: 27
+    order: sequential
+
+
+
+  - type: rotating_websites
+    position: {row: 2, col: 1}
+    proxy: true
+    urls:
+      - https://trends.google.com/trends/hottrends/visualize?nrow=5&ncol=5
+      - https://www.clockfaceonline.co.uk/clocks/text/
+    interval: 18
+    order: sequential
+
+  - type: rotating_websites
+    position: {row: 2, col: 2}
+    proxy: true
+    urls:
+      - https://www.bbc.com/sport/golf/uspga-tour/leaderboard
+      - https://www.espn.com/golf/rankings
+    interval: 23
+    order: sequential
+
+  - type: rotating_websites
+    position: {row: 2, col: 3}
+    proxy: true
+    urls:
+      - https://www.ventusky.com/?p=56.34;-2.79;6&l=feel
+      - https://www.ventusky.com/?p=56.34;-2.79;6&l=radar
+    interval: 22
+    order: sequential
+
+  - type: rotating_websites
+    position: {row: 2, col: 4}
+    proxy: true
+    urls:
+      - https://apod.nasa.gov/apod/
+      - https://science.nasa.gov/mission/webb what-is-webb-observing/#WhatIsWebbObservingTool
+    interval: 34
+    order: sequential
+
+
+
+  - type: rotating_websites
+    position: {row: 3, col: 1}
+    proxy: true
+    urls:
+      - https://jamaicaplaingazette.com/
+      - https://www.scotsman.com/
+    interval: 12
+    order: sequential
+
+  - type: rotating_websites
+    position: {row: 3, col: 2}
+    proxy: true
+    urls:
+      - https://www.windy.com/-Weather-radar-radar?radar,42.876,-71.548,7
+      - https://www.windy.com/-Weather-radar-radar?radar,55.985,-2.796,8
+    interval: 24
+    order: sequential
+
+
+  - type: rotating_websites
+    position: {row: 3, col: 3}
+    proxy: true
+    urls:
+      - https://news.ycombinator.com
+      - https://finance.yahoo.com/world-indices/
+    interval: 29
+    order: sequential
+
+  - type: rotating_websites
+    position: {row: 3, col: 4}
+    proxy: true
+    urls:
+      - https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/news
+      - http://www.thecolourclock.com/
+    interval: 32
+    order: sequential
+
+
