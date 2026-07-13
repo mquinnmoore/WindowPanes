@@ -33,6 +33,148 @@ MONITOR="${MONITOR:-}"
 
 export PORT CONFIG MEDIA_DIR
 
+# ── Pre-flight dependency check ──────────────────────────────────────
+# Runs before any side effects (Node server, Firefox window). Collects
+# hard errors (abort startup) and soft warnings (continue with note)
+# so the operator sees a clear, actionable report instead of a stack
+# trace 2 s into launch.
+#
+# Hard requirements:  node, firefox (or firefox-esr), node_modules/ with
+#                     express + js-yaml, the config file existing.
+# Soft requirements:  xrandr + xdotool only needed if MONITOR is set.
+#                     xscreensaver tooling only needed if config has any
+#                     `type: xscreensaver` pane.
+#
+# On Wayland / macOS / headless boxes some checks are skipped (not
+# applicable). Skipped checks are reported as `⊘` so the operator
+# knows they were considered and dismissed, not missed.
+declare -a _PF_ERRORS=()
+declare -a _PF_WARNINGS=()
+
+_pf_pass() { printf '  \033[32m✓\033[0m %s\n' "$1"; }
+_pf_warn() { printf '  \033[33m⚠\033[0m %s\n' "$1"; _PF_WARNINGS+=("$1"); }
+_pf_fail() { printf '  \033[31m✗\033[0m %s\n' "$1"; _PF_ERRORS+=("$1"); }
+_pf_skip() { printf '  \033[90m⊘\033[0m %s\n' "$1"; }
+
+# Detect platform once. Linux + DISPLAY set = X11 kiosk host. Wayland
+# is detected from WAYLAND_DISPLAY. macOS has no X11, so all x11-only
+# checks get a skip.
+_IS_LINUX=0
+_IS_X11=0
+_IS_WAYLAND=0
+case "$(uname -s 2>/dev/null)" in
+  Linux)
+    _IS_LINUX=1
+    [ -n "${WAYLAND_DISPLAY:-}" ] && _IS_WAYLAND=1
+    [ -n "${DISPLAY:-}" ] && _IS_X11=1
+    ;;
+esac
+
+# 1. Node.js (hard)
+if command -v node >/dev/null; then
+  _pf_pass "node $(node --version 2>/dev/null | tr -d '\n')"
+else
+  _pf_fail "node not found on PATH (install Node.js 18+ to run server.js)"
+fi
+
+# 2. Firefox (hard — required for kiosk mode)
+if command -v firefox >/dev/null; then
+  _pf_pass "firefox"
+elif command -v firefox-esr >/dev/null; then
+  _pf_pass "firefox-esr"
+elif [ "$(uname -s 2>/dev/null)" = "Darwin" ]; then
+  _pf_fail "Firefox not found. macOS dev mode is fine — open http://localhost:${PORT} in your browser manually."
+else
+  _pf_fail "firefox (or firefox-esr) not found. On Debian/Ubuntu: sudo apt install firefox"
+fi
+
+# 3. Node module deps (hard). Cheap check: does node_modules/ exist and
+# contain the top-level packages package.json declares? Cheaper than
+# spawning node just to learn the require failed.
+_NEED_NPM_INSTALL=0
+if [ ! -d "$(dirname "$0")/node_modules" ]; then
+  _NEED_NPM_INSTALL=1
+elif [ ! -d "$(dirname "$0")/node_modules/express" ] || \
+     [ ! -d "$(dirname "$0")/node_modules/js-yaml" ]; then
+  _NEED_NPM_INSTALL=1
+fi
+if [ "$_NEED_NPM_INSTALL" -eq 1 ]; then
+  _pf_fail "node_modules missing or incomplete — run \`npm install\` in $(dirname "$0")"
+else
+  _pf_pass "node_modules installed (express, js-yaml)"
+fi
+
+# 4. Config file (hard). Resolve CONFIG to an absolute path if it was
+# given relative, so the existence check matches how Node will load it.
+if [ -f "$CONFIG" ]; then
+  _pf_pass "config: $CONFIG"
+elif [ -f "$(dirname "$0")/$CONFIG" ]; then
+  _pf_pass "config: $(dirname "$0")/$CONFIG (resolved relative to script)"
+else
+  _pf_fail "config file not found: $CONFIG (and not at \$(dirname \$0)/$CONFIG either)"
+fi
+
+# 5. xrandr + xdotool — only required when MONITOR is set.
+if [ -n "$MONITOR" ]; then
+  if [ "$_IS_LINUX" -eq 0 ]; then
+    _pf_skip "MONITOR set but host is not Linux; flag will be ignored"
+  elif [ "$_IS_WAYLAND" -eq 1 ] && [ "$_IS_X11" -eq 0 ]; then
+    _pf_skip "MONITOR set but session is Wayland-only (no DISPLAY); flag will be ignored"
+  else
+    if command -v xrandr >/dev/null; then
+      _pf_pass "xrandr $(xrandr --version 2>/dev/null | head -1 | awk '{print $NF}')"
+    else
+      _pf_fail "MONITOR=${MONITOR} requested but xrandr not installed. On Debian/Ubuntu: sudo apt install xrandr"
+    fi
+    if command -v xdotool >/dev/null; then
+      _pf_pass "xdotool $(xdotool version 2>/dev/null)"
+    else
+      _pf_fail "MONITOR=${MONITOR} requested but xdotool not installed. On Debian/Ubuntu: sudo apt install xdotool"
+    fi
+  fi
+fi
+
+# 6. xscreensaver pane deps — only if the config has any of those panes.
+# Parse the config (best-effort) with a tiny Node one-liner; skip the
+# check entirely if parsing fails (the real server will report it
+# loudly later anyway).
+if [ -f "$CONFIG" ]; then
+  _HAS_XSS=0
+  if command -v node >/dev/null; then
+    _HAS_XSS=$(node -e "try{const y=require('js-yaml');const fs=require('fs');const c=y.load(fs.readFileSync(process.argv[1],'utf8'));process.stdout.write(String(((c&&c.panes)||[]).some(p=>p&&p.type==='xscreensaver')));}catch(e){process.stdout.write('0');}" "$CONFIG" 2>/dev/null || echo 0)
+  fi
+  if [ "$_HAS_XSS" = "true" ]; then
+    for tool in xvfb ffmpeg xscreensaver; do
+      if command -v "$tool" >/dev/null; then
+        _pf_pass "$tool (required by xscreensaver pane)"
+      else
+        _pf_warn "$tool not installed (required by xscreensaver pane). On Debian/Ubuntu: sudo apt install xvfb ffmpeg xscreensaver xscreensaver-data xscreensaver-data-extra xscreensaver-gl"
+      fi
+    done
+  fi
+fi
+
+# 7. Optional / nice-to-have. These never block startup.
+if [ "$_IS_LINUX" -eq 1 ] && [ "$_IS_X11" -eq 0 ] && [ "$_IS_WAYLAND" -eq 0 ]; then
+  _pf_skip "no DISPLAY or WAYLAND_DISPLAY set; running headless (Ctrl+C is the shutdown path)"
+fi
+
+# Render the summary and decide whether to proceed.
+echo
+if [ ${#_PF_ERRORS[@]} -gt 0 ]; then
+  printf '\033[31m[start.sh] Pre-flight failed:\033[0m %d hard error(s), %d warning(s)\n' "${#_PF_ERRORS[@]}" "${#_PF_WARNINGS[@]}"
+  printf '  Fix the hard errors above and re-run.\n'
+  printf '  Package install hint:\n'
+  printf '    Debian/Ubuntu:  sudo apt install nodejs firefox xrandr xdotool xvfb ffmpeg xscreensaver xscreensaver-data xscreensaver-data-extra xscreensaver-gl\n'
+  printf '    Then:           cd %s && npm install\n' "$(dirname "$0")"
+  exit 1
+fi
+if [ ${#_PF_WARNINGS[@]} -gt 0 ]; then
+  printf '\033[33m[start.sh] Pre-flight OK with %d warning(s) — continuing:\033[0m\n' "${#_PF_WARNINGS[@]}"
+else
+  printf '\033[32m[start.sh] Pre-flight OK.\033[0m\n'
+fi
+
 # Resolve target monitor geometry up front so the helper below can use it.
 # `xrandr --query` line format: "<output> connected <width>x<height>+<x>+<y> ..."
 # We capture the connected output whose name matches $MONITOR, parse the
