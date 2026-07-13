@@ -1,0 +1,47 @@
+# WindowPanes — KausAustralis TV config with a noVNC pane streaming Rukbat
+#
+# Dashboard host:   KausAustralis (where this config runs)
+# Target:           Rukbat (Mac Mini) at 100.90.213.34 (Tailscale)
+# VNC:              Rukbat's built-in Screen Sharing on port 5900
+# Proxy:            websockify on KausAustralis (:6080) bridges browser → VNC
+#
+# ── Setup checklist (one-time) ──────────────────────────────────────────────
+# 1. On KausAustralis:
+#      sudo apt install novnc websockify
+# 2. On Rukbat (the Mac Mini):
+#      System Settings → General → Sharing → Screen Sharing → ON
+#      Click ⓘ → "VNC viewers may control screen with password" → set a pw
+#      (This was the blocker on 2026-07-11 — Quinn's prior noVNC attempt
+#       stalled at three-dot handshake because this checkbox wasn't set.)
+# 3. Start the websockify proxy on KausAustralis. Either run manually:
+#      websockify --web /usr/share/novnc 6080 100.90.213.34:5900
+#    or install the systemd unit shipped with this repo (see systemd/
+#    websockify-novnc.service) and edit VNC_TARGET to 100.90.213.34:5900.
+# 4. Quick sanity check from KausAustralis:
+#      nc -zv 100.90.213.34 5900     # should show "open"
+# 5. Launch:
+#      MONITOR=DisplayPort-1 CONFIG=./rukbat_novnc_config.yaml ./start.sh
+#
+# ── Password handling ──────────────────────────────────────────────────────
+# The VNC password is currently passed in plaintext via the URL query string
+# (noVNC's design). This file uses a ${RUKBAT_VNC_PASSWORD} placeholder
+# for readability but, because the novnc_url is passed verbatim to the
+# browser without server-side env interpolation, you'll need to substitute
+# the actual password before launching. Either:
+#   - sed in place:  sed -i "s/\${RUKBAT_VNC_PASSWORD}/$RUKBAT_VNC_PASSWORD/" \
+#                       rukbat_novnc_config.yaml
+#   - or hand-edit and commit a non-public copy.
+# (A small server.js patch to interpolate ${VAR} in novnc_url is a
+#  reasonable follow-up if this gets used regularly.)
+#
+# ── Layout ─────────────────────────────────────────────────────────────────
+# Single-pane full-screen dashboard showing Rukbat's desktop on the TV.
+
+layout:
+  rows: 1
+  columns: 1
+
+panes:
+  - type: novnc
+    position: {row: 1, col: 1}
+    novnc_url: "http://localhost:6080/vnc.html?host=localhost&port=6080&autoconnect=true&resize=scale&password=${RUKBAT_VNC_PASSWORD}"
