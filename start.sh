@@ -15,19 +15,56 @@
 # Usage:
 #   ./start.sh                         # defaults
 #   PORT=8080 MEDIA_DIR=/mnt/videos CONFIG=./my.yaml ./start.sh
+#   MONITOR=HDMI-0 ./start.sh          # pin kiosk to one monitor (X11 + xrandr)
+#
+# MONITOR:
+#   Names the xrandr output (e.g. HDMI-0, DP-1, eDP-1) that the Firefox
+#   kiosk should fully fill. Requires xrandr + an X11 session. The other
+#   monitors stay enabled — they're just not claimed by the kiosk window.
+#   On Wayland, GNOME/KDE without xrandr, or any non-X11 setup, the flag
+#   is silently ignored and the kiosk opens on the primary display.
 #
 set -euo pipefail
 
 PORT="${PORT:-3000}"
 CONFIG="${CONFIG:-$(dirname "$0")/config.yaml}"
 MEDIA_DIR="${MEDIA_DIR:-/media}"
+MONITOR="${MONITOR:-}"
 
 export PORT CONFIG MEDIA_DIR
+
+# Resolve target monitor geometry up front so the helper below can use it.
+# `xrandr --query` line format: "<output> connected <width>x<height>+<x>+<y> ..."
+# We capture the connected output whose name matches $MONITOR, parse the
+# geometry out, and export it as MONITOR_GEOM="W H X Y" for the panner.
+MONITOR_GEOM=""
+if [ -n "$MONITOR" ]; then
+  if command -v xrandr >/dev/null && [ -n "${DISPLAY:-}" ]; then
+    line="$(xrandr --query 2>/dev/null | awk -v m="$MONITOR" '$1==m && $2=="connected"{print; exit}')"
+    if [ -n "$line" ]; then
+      # First WxH+OFFSET token, e.g. "1920x1080+1920+0"
+      geom="$(echo "$line" | grep -oE '[0-9]+x[0-9]+\+[0-9]+\+[0-9]+' | head -1)"
+      if [ -n "$geom" ]; then
+        MONITOR_GEOM="${geom%x*}"          # strip "+X+Y" suffix → "1920x1080"
+        MONITOR_GEOM="${MONITOR_GEOM//+/_}"  # pure digits/digits only, ready to split
+        echo "  Monitor:   $MONITOR ($MONITOR_GEOM)"
+      else
+        echo "[start.sh] MONITOR=$MONITOR is connected but xrandr returned no geometry; falling back to primary display"
+      fi
+    else
+      echo "[start.sh] MONITOR=$MONITOR not found by xrandr; falling back to primary display"
+    fi
+  else
+    echo "[start.sh] MONITOR is set but xrandr or DISPLAY is unavailable; falling back to primary display"
+  fi
+fi
+export MONITOR_GEOM
 
 echo "Starting WindowPanes..."
 echo "  Port:      $PORT"
 echo "  Config:    $CONFIG"
 echo "  Media dir: $MEDIA_DIR"
+[ -n "$MONITOR" ] && [ -z "$MONITOR_GEOM" ] && echo "  Monitor:   $MONITOR (resolution not resolved — kiosk will open on primary)"
 
 # Start the Node server in the background
 node "$(dirname "$0")/server.js" &
@@ -41,19 +78,57 @@ URL="http://localhost:${PORT}"
 echo "Opening Firefox kiosk at $URL"
 
 FIREFOX_PID=""
+FIREFOX_BIN=""
 if command -v firefox &>/dev/null; then
+  FIREFOX_BIN="firefox"
+elif command -v firefox-esr &>/dev/null; then
+  FIREFOX_BIN="firefox-esr"
+fi
+
+if [ -n "$FIREFOX_BIN" ]; then
   # --new-instance forces a fresh Firefox process even when the default
   # profile is already in use by another running Firefox session. Without
   # it, `firefox --kiosk $URL` hands the URL to the running instance,
   # which loads it as a regular tab in that window instead of opening a
   # kiosk on the display.
-  firefox --kiosk --new-instance "$URL" &
-  FIREFOX_PID=$!
-elif command -v firefox-esr &>/dev/null; then
-  firefox-esr --kiosk --new-instance "$URL" &
+  "$FIREFOX_BIN" --kiosk --new-instance "$URL" &
   FIREFOX_PID=$!
 else
   echo "Firefox not found. Open $URL manually in a browser."
+fi
+
+# If MONITOR is set and we have xdotool + a fresh Firefox PID, move/resize
+# the kiosk window onto the target monitor after a short settle delay.
+# Firefox's --kiosk flag claims the primary display by default; wmctrl-
+# style geometry override via xdotool is the portable X11 escape hatch.
+# We do this in the background so start.sh keeps watching the server.
+if [ -n "$MONITOR_GEOM" ] && [ -n "$FIREFOX_PID" ] && command -v xdotool >/dev/null && [ -n "${DISPLAY:-}" ]; then
+  (
+    sleep 2  # let Firefox's window come up before we try to grab it
+    # W and H are the first two whitespace-separated fields of MONITOR_GEOM
+    # (formatted "W H" — see parsing above). Anything else (empty, malformed)
+    # bails out without touching the window.
+    W="$(echo "$MONITOR_GEOM" | awk '{print $1}')"
+    H="$(echo "$MONITOR_GEOM" | awk '{print $2}')"
+    X="$(echo "$MONITOR_GEOM" | awk '{print $3}')"
+    Y="$(echo "$MONITOR_GEOM" | awk '{print $4}')"
+    if [ -n "$W" ] && [ -n "$H" ]; then
+      # X/Y default to 0 if the monitor is the leftmost (offset not parsed)
+      : "${X:=0}" "${Y:=0}"
+      # waituntil makes xdotool retry until Firefox's window exists, with a
+      # hard 10s ceiling in case something else is slow.
+      if xdotool search --sync --onlyvisible --class "firefox" windowunmap \
+            windowmap 2>/dev/null; then :; fi
+      WID="$(xdotool search --onlyvisible --class "firefox" 2>/dev/null | head -1 || true)"
+      if [ -n "$WID" ]; then
+        xdotool windowmove "$WID" "$X" "$Y" 2>/dev/null || true
+        xdotool windowsize "$WID" "$W" "$H" 2>/dev/null || true
+        xdotool windowraise "$WID" 2>/dev/null || true
+        echo "[start.sh] kiosk window pinned to $MONITOR (${W}x${H}+${X}+${Y})"
+      fi
+    fi
+  ) &
+  disown 2>/dev/null || true
 fi
 
 # Cleanup trap — runs on Ctrl+C in this terminal, SIGTERM, or signals
