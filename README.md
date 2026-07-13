@@ -16,6 +16,50 @@ npm install
 
 This starts the server on port 3000 and opens Firefox in kiosk mode.
 
+### Multi-Monitor Setups — Pin the Kiosk to One Display
+
+`./start.sh` opens Firefox in `--kiosk` mode, which by default claims
+your primary display. If the host has more than one connected monitor
+(e.g. a workstation with a TV, or several side-by-side displays), set
+the `MONITOR` environment variable to the xrandr output name you want
+the kiosk to fill. The other monitors stay enabled and usable for
+normal work — only the Firefox window is moved onto the named output.
+
+```bash
+# Find the right output name first
+xrandr --query | grep connected
+#   HDMI-0 connected 1920x1080+1920+0 ...
+#   DP-1 connected 2560x1440+0+0 ...
+#   DP-2 connected 2560x1440+2560+0 ...
+#   eDP-1 connected 3840x2160+5120+0 ...
+
+# Pin the kiosk to the TV (HDMI-0) and leave the other three alone
+MONITOR=HDMI-0 ./start.sh
+```
+
+What happens under the hood:
+
+1. `start.sh` runs `xrandr --query`, finds the named output, and parses
+   its `WxH+X+Y` geometry.
+2. After Firefox launches, a background `xdotool` job `windowmove`s +
+   `windowsize`s the kiosk window onto that monitor's exact rect and
+   `windowraise`s it.
+3. The other monitors are unaffected — you can keep using them for
+   your usual work while the dashboard plays on the TV.
+
+**Backwards compatible:** `MONITOR` unset (or empty) leaves behavior
+unchanged — the kiosk opens on the primary display. The flag is also
+silently ignored if `xrandr` or `xdotool` isn't installed, no `DISPLAY`
+is set (Wayland / headless), or the named output isn't connected; in
+those cases a note is printed to the terminal and the kiosk falls back
+to the primary display. Single-monitor setups (Arkab) are unaffected.
+
+> **Wayland note:** `xdotool` requires an X11 session. On Wayland, the
+> `MONITOR` flag has no effect; the kiosk opens on whichever display
+> the compositor picks. To pin a kiosk window on Wayland you'd need
+> compositor-specific tooling (`swaymsg`, `kdotool`, a window rule in
+> your compositor's config) — out of scope for this script.
+
 ## Configuration
 
 Edit `config.yaml` to define your layout and panes:
@@ -303,6 +347,7 @@ The server will serve `/mnt/storage/clips/saber_01.mkv`.
 | `PORT` | `3000` | Server port |
 | `CONFIG` | `./config.yaml` | Path to config file |
 | `MEDIA_DIR` | `/media` | Root directory for media files |
+| `MONITOR` | _(unset)_ | xrandr output name the Firefox kiosk should fill (e.g. `HDMI-0`). Other monitors stay enabled. Requires `xrandr` + `xdotool` and an X11 session. See the [Multi-Monitor Setups](#multi-monitor-setups--pin-the-kiosk-to-one-display) section above. |
 | `PROXY_ALLOWLIST` | _(none)_ | Comma-separated hostnames allowed by `/api/proxy` (e.g. `weather.com,reddit.com`). If unset, anything not blocked by the SSRF guard is allowed. |
 | `SCREENSAVER_FRAME_DIR` | `/tmp/windowpanes-screensaver` | Where `xscreensaver` panes write JPEG frames. Override if `/tmp` is too small / on tmpfs without enough space. |
 
@@ -335,6 +380,22 @@ Browser (Firefox kiosk)
 - Node.js 18+
 - Firefox (for kiosk mode)
 - Video files accessible on the local filesystem
-- For `xscreensaver` panes (Linux only): `xvfb`, `ffmpeg`, `xscreensaver`,
-  `xscreensaver-data`, `xscreensaver-data-extra`, `xscreensaver-gl` — see
-  the `xscreensaver` pane section above for the full list and rationale.
+
+**Linux (X11) — for `MONITOR=` multi-monitor pinning:**
+
+| Tool | Purpose | Debian/Ubuntu apt package |
+|------|---------|---------------------------|
+| `xrandr` | enumerate connected outputs and their geometries | `xrandr` |
+| `xdotool` | move/resize the kiosk window onto the named monitor | `xdotool` |
+
+```bash
+sudo apt install xrandr xdotool
+```
+
+Both are no-ops on single-monitor setups (Arkab) — `start.sh` simply
+skips the pinning step if `MONITOR` is unset. The flag requires an X11
+session; on Wayland it has no effect (see the Wayland note above).
+
+**Linux — for `xscreensaver` panes:** `xvfb`, `ffmpeg`, `xscreensaver`,
+`xscreensaver-data`, `xscreensaver-data-extra`, `xscreensaver-gl` — see
+the `xscreensaver` pane section above for the full list and rationale.
