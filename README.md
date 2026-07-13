@@ -16,6 +16,33 @@ npm install
 
 This starts the server on port 3000 and opens Firefox in kiosk mode.
 
+### Pre-flight Dependency Check
+
+`./start.sh` runs a pre-flight check before launching the Node server
+or opening Firefox. It verifies:
+
+- `node` (18+) is on `PATH`
+- `firefox` or `firefox-esr` is installed
+- `node_modules/` has been populated (`npm install` run) and contains
+  the declared packages (`express`, `js-yaml`)
+- the `CONFIG` file actually exists at the path you gave
+- if `MONITOR` is set: `xrandr` + `xdotool` are installed and an X11
+  session is available
+- if the config has any `xscreensaver` panes: `xvfb`, `ffmpeg`,
+  `xscreensaver` are installed
+
+Hard failures (missing node / firefox / node_modules / config) print a
+clear error, an apt install hint, and abort with exit code 1 before
+launching anything. Soft failures (xscreensaver tooling missing when
+no xscreensaver pane is configured, or vice-versa) print a warning and
+continue. A successful run prints a green `Pre-flight OK.` and proceeds
+to launch the dashboard.
+
+This is the single most useful sanity check for the most common
+WindowPanes failure modes: a fresh clone that's never had `npm install`
+run, a typo in the config filename, a missing Firefox on a headless
+host, or a `MONITOR=` value the system doesn't recognize.
+
 ### Multi-Monitor Setups — Pin the Kiosk to One Display
 
 `./start.sh` opens Firefox in `--kiosk` mode, which by default claims
