@@ -45,9 +45,14 @@ if [ -n "$MONITOR" ]; then
       # First WxH+OFFSET token, e.g. "1920x1080+1920+0"
       geom="$(echo "$line" | grep -oE '[0-9]+x[0-9]+\+[0-9]+\+[0-9]+' | head -1)"
       if [ -n "$geom" ]; then
-        MONITOR_GEOM="${geom%x*}"          # strip "+X+Y" suffix → "1920x1080"
-        MONITOR_GEOM="${MONITOR_GEOM//+/_}"  # pure digits/digits only, ready to split
-        echo "  Monitor:   $MONITOR ($MONITOR_GEOM)"
+        # Parse "WxH+X+Y" into four space-separated fields.
+        # The previous approach (${geom%x*}) only captured W; awk is cleaner.
+        _W=$(echo "$geom" | awk -Fx '{print $1}')
+        _H=$(echo "$geom" | awk -Fx '{print $2}' | awk -F+ '{print $1}')
+        _X=$(echo "$geom" | awk -F+ '{print $2}')
+        _Y=$(echo "$geom" | awk -F+ '{print $3}')
+        MONITOR_GEOM="$_W $_H $_X $_Y"
+        echo "  Monitor:   $MONITOR (${_W}x${_H}+${_X}+${_Y})"
       else
         echo "[start.sh] MONITOR=$MONITOR is connected but xrandr returned no geometry; falling back to primary display"
       fi
@@ -173,6 +178,14 @@ start_key_watcher() {
   # instantly and looked identical from the script's perspective.)
   if ! xdotool getmouselocation --shell >/dev/null 2>&1; then
     echo "[start.sh] xdotool can't reach the X server; skipping key watcher (use Ctrl+C in this terminal)"
+    return
+  fi
+
+  # `waitforkey` was removed in xdotool 3.x (Ubuntu 24.04 ships 3.20160805).
+  # Check for it before spawning watchers; fall back silently if absent.
+  if ! xdotool waitforkey --help >/dev/null 2>&1 && \
+     ! xdotool help 2>&1 | grep -q 'waitforkey'; then
+    echo "[start.sh] xdotool installed but 'waitforkey' not available ($(xdotool version 2>/dev/null || echo 'unknown version')); skipping key watcher (use Ctrl+C in this terminal)"
     return
   fi
 
