@@ -19,18 +19,12 @@ panes:
     interval: 20
     order: sequential
 
-  - type: rotating_websites
+
+  - type: novnc
+    novnc_url: "http://localhost:6080/vnc.html?host=localhost&port=6080&path=&
+autoconnect=true&resize=scale&colordepth=24&password=H@mbixa27"
     position: {row: 1, col: 2}
-    proxy: true
-    urls:
-      - https://www.ventusky.com/?p=42.36;-71.06;6&l=feel
-      - https://www.ventusky.com/?p=42.36;-71.06;6&l=radar
-      - https://www.ventusky.com/?p=56.34;-2.79;6&l=feel
-      - https://www.ventusky.com/?p=56.34;-2.79;6&l=radar
-      - https://apod.nasa.gov/apod/
-      - https://science.nasa.gov/mission/webb what-is-webb-observing/#WhatIsWebbObservingTool
-    interval: 10
-    order: sequential
+
 
   - type: rotating_websites
     position: {row: 2, col: 1}
@@ -46,6 +40,7 @@ panes:
       - https://finance.yahoo.com/world-indices/
     interval: 16
     order: sequential
+
 
   - type: rotating_websites
     position: {row: 2, col: 2}
