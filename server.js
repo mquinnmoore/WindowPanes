@@ -58,7 +58,7 @@ function resolvePaneVideos(pane) {
 
   let matches;
   try {
-    matches = fs.globSync(patterns, { cwd: MEDIA_DIR });
+    matches = fs.globSync(patterns);
   } catch (err) {
     console.warn(`[videos_glob] failed to expand ${JSON.stringify(patterns)}: ${err.message}`);
     matches = [];
