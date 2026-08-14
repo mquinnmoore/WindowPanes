@@ -168,7 +168,9 @@
 
     function playNext() {
       video.src = toMediaUrl(videos[index]);
-      video.play().catch(() => {}); // autoplay may require muted
+      video.play().catch((err) => {
+        el.innerHTML = `<div class="pane-error">play() failed: ${err.message || err.name}</div>`;
+      });
     }
 
     function advance() {
@@ -192,7 +194,7 @@
     });
 
     video.addEventListener('error', () => {
-      console.warn('Video error, skipping:', videos[index]);
+      console.warn('Video error:', videos[index], 'readyState=', video.readyState, 'networkState=', video.networkState, 'error=', video.error && video.error.code);
       if (advance()) setTimeout(playNext, 1000);
     });
 
