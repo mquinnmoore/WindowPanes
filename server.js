@@ -10,8 +10,6 @@ const logic = require('./xscreensaver-logic');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const CONFIG_PATH = process.env.CONFIG || path.join(__dirname, 'config.yaml');
-const MEDIA_DIR = process.env.MEDIA_DIR || '/media';
-
 // Where captured frame JPEGs land for /api/screensaver/<id>.jpg
 const SCREENSAVER_FRAME_DIR = process.env.SCREENSAVER_FRAME_DIR
   || '/tmp/windowpanes-screensaver';
@@ -21,11 +19,92 @@ const SCREENSAVER_XVFB_READY_TIMEOUT_MS = 5000;
 // Serve static frontend files
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Serve media files (videos, images, etc.)
-app.use('/media', express.static(MEDIA_DIR, {
-  // Allow range requests for video seeking
-  acceptRanges: true
-}));
+// Serve media files via /api/file proxy — accepts an absolute filesystem path
+// via ?path=... and streams the file with Range support and Content-Type
+// detection. Paths in config match paths on disk 1:1; no MEDIA_DIR indirection.
+//
+// Note: this exposes the host filesystem to anyone who can reach the server.
+// Acceptable for a kiosk on a trusted LAN; lock down or proxy through a
+// dedicated path-allowlist if exposing beyond that.
+app.get('/api/file', (req, res) => {
+  const filePath = req.query.path;
+  if (!filePath || typeof filePath !== 'string') {
+    return res.status(400).json({ error: 'Missing path query param' });
+  }
+  if (!path.isAbsolute(filePath)) {
+    return res.status(400).json({ error: 'Path must be absolute' });
+  }
+
+  let stat;
+  try {
+    stat = fs.statSync(filePath);
+  } catch (err) {
+    if (err.code === 'ENOENT') return res.status(404).json({ error: 'File not found' });
+    return res.status(500).json({ error: 'stat failed', detail: err.message });
+  }
+  if (!stat.isFile()) return res.status(404).json({ error: 'Not a regular file' });
+
+  const mime = getMimeType(filePath);
+  res.setHeader('Accept-Ranges', 'bytes');
+  res.setHeader('Content-Type', mime);
+
+  const range = req.headers.range;
+  if (range) {
+    const m = /^bytes=(\d*)-(\d*)$/.exec(range);
+    if (m) {
+      let s = m[1] === '' ? null : parseInt(m[1], 10);
+      let e = m[2] === '' ? null : parseInt(m[2], 10);
+      if (s === null && e === null) {
+        res.setHeader('Content-Range', `bytes */${stat.size}`);
+        return res.status(416).end();
+      }
+      if (s === null) {
+        // suffix range: last N bytes
+        s = Math.max(0, stat.size - e);
+        e = stat.size - 1;
+      } else if (e === null) {
+        e = stat.size - 1;
+      }
+      if (s > e || s >= stat.size) {
+        res.setHeader('Content-Range', `bytes */${stat.size}`);
+        return res.status(416).end();
+      }
+      res.status(206);
+      res.setHeader('Content-Range', `bytes ${s}-${e}/${stat.size}`);
+      res.setHeader('Content-Length', e - s + 1);
+      fs.createReadStream(filePath, { start: s, end: e }).pipe(res);
+      return;
+    }
+  }
+
+  res.setHeader('Content-Length', stat.size);
+  fs.createReadStream(filePath).pipe(res);
+});
+
+// Content-Type lookup for /api/file. Covers the common video / audio / image
+// formats a kiosk config references. Falls back to application/octet-stream.
+function getMimeType(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  const types = {
+    '.mp4':  'video/mp4',
+    '.webm': 'video/webm',
+    '.ogv':  'video/ogg',
+    '.mkv':  'video/x-matroska',
+    '.mov':  'video/quicktime',
+    '.m4v':  'video/x-m4v',
+    '.mp3':  'audio/mpeg',
+    '.wav':  'audio/wav',
+    '.flac': 'audio/flac',
+    '.m4a':  'audio/mp4',
+    '.jpg':  'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png':  'image/png',
+    '.gif':  'image/gif',
+    '.webp': 'image/webp',
+    '.svg':  'image/svg+xml',
+  };
+  return types[ext] || 'application/octet-stream';
+}
 
 // API: return parsed config as JSON
 function readConfig() {
@@ -45,10 +124,10 @@ function readConfig() {
 // Expand pane.videos_glob (string or string[]) into pane.videos, sorted
 // alphabetically for deterministic sequential playback. Explicit pane.videos
 // entries (if any) are preserved first; glob matches are appended. Patterns
-// are resolved against MEDIA_DIR (the same root that /api/media serves), so
-// relative patterns like '2001-hals*' expand to filenames under MEDIA_DIR and
-// the client's toMediaUrl() can re-prefix them with '/media/'. Failures are
-// logged but non-fatal — the pane falls back to its explicit pane.videos list.
+// must be absolute filesystem paths (e.g. /home/user/videos/*.mp4); results
+// are served verbatim via the /api/file proxy — no MEDIA_DIR indirection.
+// Failures are logged but non-fatal — the pane falls back to its explicit
+// pane.videos list.
 function resolvePaneVideos(pane) {
   const globs = pane.videos_glob;
   if (globs == null) return pane;
@@ -994,7 +1073,6 @@ app.get('/api/screensaver/:paneId.jpg', (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`WindowPanes server running at http://localhost:${PORT}`);
   console.log(`Config: ${CONFIG_PATH}`);
-  console.log(`Media dir: ${MEDIA_DIR}`);
   if (PROXY_ALLOWLIST.length > 0) {
     console.log(`Proxy allowlist: ${PROXY_ALLOWLIST.join(', ')}`);
   } else {
