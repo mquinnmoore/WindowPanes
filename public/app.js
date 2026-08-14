@@ -166,10 +166,24 @@
     let index = isRandom ? randomInt(videos.length) : 0;
     const shouldLoop = pane.loop !== false;
 
+    // Side-channel status — appended alongside the video, not replacing it.
+// Setting innerHTML on `el` would remove the video element from the DOM and
+// abort any in-flight /api/file request (NS_BINDING_ABORTED), creating a
+// noisy error loop. This avoids that.
+function showPaneStatus(msg, isError) {
+      let status = el.querySelector('.pane-status');
+      if (!status) {
+        status = document.createElement('div');
+        status.className = 'pane-status' + (isError ? ' pane-error' : '');
+        el.appendChild(status);
+      }
+      status.textContent = msg;
+    }
+
     function playNext() {
       video.src = toMediaUrl(videos[index]);
       video.play().catch((err) => {
-        el.innerHTML = `<div class="pane-error">play() failed: ${err.message || err.name}</div>`;
+        showPaneStatus(`play() failed: ${err.message || err.name}`, true);
       });
     }
 
@@ -195,6 +209,7 @@
 
     video.addEventListener('error', () => {
       console.warn('Video error:', videos[index], 'readyState=', video.readyState, 'networkState=', video.networkState, 'error=', video.error && video.error.code);
+      showPaneStatus(`video error: code=${video.error && video.error.code} readyState=${video.readyState}`, true);
       if (advance()) setTimeout(playNext, 1000);
     });
 
