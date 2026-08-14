@@ -29,20 +29,27 @@ panes:
 
 # ── video_playlist with videos_glob ─────────────────────────────────────
 # Expand glob patterns into the playlist at config load. Patterns may be a
-# single string or a list; both forms supported. Use absolute paths. Results
-# are sorted alphabetically so 'sequential' order is deterministic. Explicit
-# `videos:` entries (if any) are kept first; glob matches are appended.
+# single string or a list; both forms supported. Patterns are resolved
+# against MEDIA_DIR (the same root /media/ serves), so relative patterns
+# like 'saber_duels/*.mkv' are preferred — the client prepends '/media/'
+# and the server resolves them under MEDIA_DIR cleanly. Absolute paths
+# also work but the client will prepend '/media/' to the returned path,
+# so the file must be reachable both at its absolute location AND under
+# MEDIA_DIR (rarely true). Results are sorted alphabetically so
+# 'sequential' order is deterministic. Explicit `videos:` entries (if
+# any) are kept first; glob matches are appended.
 #
 #   - type: video_playlist
 #     position: {row: 2, col: 1}
 #     videos_glob:
-#       - /media/clips/saber_duels/*.mkv
-#       - /media/clips/shorts/*.mp4
+#       - saber_duels/*.mkv
+#       - shorts/*.mp4
 #     loop: true
 #     order: random        # works fine with globs (results sorted first)
 #
 # Resolved at server boot (and on every /api/config fetch) via Node 24's
-# built-in fs.globSync — no extra dependency.
+# built-in fs.globSync — no extra dependency. Set MEDIA_DIR to wherever
+# your videos actually live; relative patterns expand from there.
 
 # ── noVNC example ───────────────────────────────────────────────────────────
 # To show a remote desktop pane, add a pane like this and run websockify

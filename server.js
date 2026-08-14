@@ -45,8 +45,10 @@ function readConfig() {
 // Expand pane.videos_glob (string or string[]) into pane.videos, sorted
 // alphabetically for deterministic sequential playback. Explicit pane.videos
 // entries (if any) are preserved first; glob matches are appended. Patterns
-// should be absolute paths (e.g. /media/clips/*.mkv). Failures are logged but
-// non-fatal — the pane will fall back to its explicit pane.videos list.
+// are resolved against MEDIA_DIR (the same root that /api/media serves), so
+// relative patterns like '2001-hals*' expand to filenames under MEDIA_DIR and
+// the client's toMediaUrl() can re-prefix them with '/media/'. Failures are
+// logged but non-fatal — the pane falls back to its explicit pane.videos list.
 function resolvePaneVideos(pane) {
   const globs = pane.videos_glob;
   if (globs == null) return pane;
@@ -56,7 +58,7 @@ function resolvePaneVideos(pane) {
 
   let matches;
   try {
-    matches = fs.globSync(patterns);
+    matches = fs.globSync(patterns, { cwd: MEDIA_DIR });
   } catch (err) {
     console.warn(`[videos_glob] failed to expand ${JSON.stringify(patterns)}: ${err.message}`);
     matches = [];
