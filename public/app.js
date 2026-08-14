@@ -88,7 +88,7 @@
     const iframe = document.createElement('iframe');
     iframe.src = resolveSrc(pane, pane.url, paneId);
     iframe.setAttribute('loading', 'lazy');
-    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups');
+    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals');
     if (pane.proxy) el.classList.add('proxied');
     el.appendChild(iframe);
   }
@@ -271,7 +271,7 @@
     iframe.src = pane.novnc_url;
     iframe.setAttribute('loading', 'lazy');
     // noVNC needs scripts; forms + popups for its toolbar/clipboard support
-    iframe.setAttribute('sandbox', 'allow-scripts allow-forms allow-popups allow-modals');
+    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals');
     iframe.setAttribute('allow', 'clipboard-read; clipboard-write');
     el.appendChild(iframe);
   }
