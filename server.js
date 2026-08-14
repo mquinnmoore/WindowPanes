@@ -30,7 +30,45 @@ app.use('/media', express.static(MEDIA_DIR, {
 // API: return parsed config as JSON
 function readConfig() {
   const raw = fs.readFileSync(CONFIG_PATH, 'utf8');
-  return yaml.load(raw);
+  const cfg = yaml.load(raw);
+
+  // Expand videos_glob for video_playlist panes (Node 22+ fs.globSync)
+  if (cfg && Array.isArray(cfg.panes)) {
+    for (const pane of cfg.panes) {
+      if (pane && pane.type === 'video_playlist') resolvePaneVideos(pane);
+    }
+  }
+
+  return cfg;
+}
+
+// Expand pane.videos_glob (string or string[]) into pane.videos, sorted
+// alphabetically for deterministic sequential playback. Explicit pane.videos
+// entries (if any) are preserved first; glob matches are appended. Patterns
+// should be absolute paths (e.g. /media/clips/*.mkv). Failures are logged but
+// non-fatal — the pane will fall back to its explicit pane.videos list.
+function resolvePaneVideos(pane) {
+  const globs = pane.videos_glob;
+  if (globs == null) return pane;
+
+  const patterns = Array.isArray(globs) ? globs : [globs];
+  if (patterns.length === 0) return pane;
+
+  let matches;
+  try {
+    matches = fs.globSync(patterns);
+  } catch (err) {
+    console.warn(`[videos_glob] failed to expand ${JSON.stringify(patterns)}: ${err.message}`);
+    matches = [];
+  }
+
+  if (matches.length === 0) {
+    console.warn(`[videos_glob] no matches for ${JSON.stringify(patterns)}`);
+  }
+
+  matches.sort();
+  pane.videos = [...(pane.videos || []), ...matches];
+  return pane;
 }
 
 app.get('/api/config', (req, res) => {
