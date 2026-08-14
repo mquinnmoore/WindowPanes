@@ -210,7 +210,12 @@ function showPaneStatus(msg, isError) {
     video.addEventListener('error', () => {
       console.warn('Video error:', videos[index], 'readyState=', video.readyState, 'networkState=', video.networkState, 'error=', video.error && video.error.code);
       showPaneStatus(`video error: code=${video.error && video.error.code} readyState=${video.readyState}`, true);
-      if (advance()) setTimeout(playNext, 1000);
+      // Stop the retry loop. Each src change aborts the in-flight
+      // /api/file request, which produces NS_BINDING_ABORTED spam in the
+      // console. If the error is a format/codec issue (code 4), retrying
+      // with the next video won't help — they all use the same codec.
+      // User reload after fixing the codec. (advance() is left in place
+      // in case we want to re-enable retry for transient errors later.)
     });
 
     playNext();
