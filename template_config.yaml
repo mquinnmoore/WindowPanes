@@ -27,6 +27,23 @@ panes:
     interval: 30
     order: sequential    # 'sequential' (default) or 'random'
 
+# ── video_playlist with videos_glob ─────────────────────────────────────
+# Expand glob patterns into the playlist at config load. Patterns may be a
+# single string or a list; both forms supported. Use absolute paths. Results
+# are sorted alphabetically so 'sequential' order is deterministic. Explicit
+# `videos:` entries (if any) are kept first; glob matches are appended.
+#
+#   - type: video_playlist
+#     position: {row: 2, col: 1}
+#     videos_glob:
+#       - /media/clips/saber_duels/*.mkv
+#       - /media/clips/shorts/*.mp4
+#     loop: true
+#     order: random        # works fine with globs (results sorted first)
+#
+# Resolved at server boot (and on every /api/config fetch) via Node 24's
+# built-in fs.globSync — no extra dependency.
+
 # ── noVNC example ───────────────────────────────────────────────────────────
 # To show a remote desktop pane, add a pane like this and run websockify
 # on the WindowPanes machine pointing at the target machine's VNC port.
