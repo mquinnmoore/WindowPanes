@@ -28,10 +28,9 @@ set -euo pipefail
 
 PORT="${PORT:-3000}"
 CONFIG="${CONFIG:-$(dirname "$0")/config.yaml}"
-MEDIA_DIR="${MEDIA_DIR:-/media}"
 MONITOR="${MONITOR:-}"
 
-export PORT CONFIG MEDIA_DIR
+export PORT CONFIG
 
 # ── Pre-flight dependency check ──────────────────────────────────────
 # Runs before any side effects (Node server, Firefox window). Collects
@@ -210,7 +209,6 @@ export MONITOR_GEOM
 echo "Starting WindowPanes..."
 echo "  Port:      $PORT"
 echo "  Config:    $CONFIG"
-echo "  Media dir: $MEDIA_DIR"
 [ -n "$MONITOR" ] && [ -z "$MONITOR_GEOM" ] && echo "  Monitor:   $MONITOR (resolution not resolved — kiosk will open on primary)"
 
 # Start the Node server in the background

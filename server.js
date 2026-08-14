@@ -45,8 +45,10 @@ function readConfig() {
 // Expand pane.videos_glob (string or string[]) into pane.videos, sorted
 // alphabetically for deterministic sequential playback. Explicit pane.videos
 // entries (if any) are preserved first; glob matches are appended. Patterns
-// should be absolute paths (e.g. /media/clips/*.mkv). Failures are logged but
-// non-fatal — the pane will fall back to its explicit pane.videos list.
+// must be absolute filesystem paths (e.g. /home/user/videos/*.mp4); results
+// are served verbatim via the /api/file proxy — no MEDIA_DIR indirection.
+// Failures are logged but non-fatal — the pane falls back to its explicit
+// pane.videos list.
 function resolvePaneVideos(pane) {
   const globs = pane.videos_glob;
   if (globs == null) return pane;
@@ -992,7 +994,6 @@ app.get('/api/screensaver/:paneId.jpg', (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`WindowPanes server running at http://localhost:${PORT}`);
   console.log(`Config: ${CONFIG_PATH}`);
-  console.log(`Media dir: ${MEDIA_DIR}`);
   if (PROXY_ALLOWLIST.length > 0) {
     console.log(`Proxy allowlist: ${PROXY_ALLOWLIST.join(', ')}`);
   } else {

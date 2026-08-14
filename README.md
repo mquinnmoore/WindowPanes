@@ -358,14 +358,14 @@ display when the dashboard shuts down.
 
 ### Video Paths
 
-Video file paths in the config should be absolute paths on the host filesystem. The server mounts a media directory at `/media`. Set the `MEDIA_DIR` environment variable to point to the root of your media files.
+Video file paths in the config must be absolute paths on the host filesystem. The server streams files via the `/api/file?path=<absolute>` endpoint — no MEDIA_DIR indirection, paths in config match paths on disk 1:1.
 
-For example, if `MEDIA_DIR=/mnt/storage` and your config has:
+For example, with config:
 ```yaml
 videos:
-  - /media/clips/saber_01.mkv
+  - /home/user/videos/clips/saber_01.mkv
 ```
-The server will serve `/mnt/storage/clips/saber_01.mkv`.
+The browser fetches `/api/file?path=%2Fhome%2Fuser%2Fvideos%2Fclips%2Fsaber_01.mkv` and the server streams `/home/user/videos/clips/saber_01.mkv`.
 
 ## Environment Variables
 
@@ -373,7 +373,6 @@ The server will serve `/mnt/storage/clips/saber_01.mkv`.
 |----------|---------|-------------|
 | `PORT` | `3000` | Server port |
 | `CONFIG` | `./config.yaml` | Path to config file |
-| `MEDIA_DIR` | `/media` | Root directory for media files |
 | `MONITOR` | _(unset)_ | xrandr output name the Firefox kiosk should fill (e.g. `HDMI-0`). Other monitors stay enabled. Requires `xrandr` + `xdotool` and an X11 session. See the [Multi-Monitor Setups](#multi-monitor-setups--pin-the-kiosk-to-one-display) section above. |
 | `PROXY_ALLOWLIST` | _(none)_ | Comma-separated hostnames allowed by `/api/proxy` (e.g. `weather.com,reddit.com`). If unset, anything not blocked by the SSRF guard is allowed. |
 | `SCREENSAVER_FRAME_DIR` | `/tmp/windowpanes-screensaver` | Where `xscreensaver` panes write JPEG frames. Override if `/tmp` is too small / on tmpfs without enough space. |
@@ -393,7 +392,7 @@ npm start
 Browser (Firefox kiosk)
   └── GET / → index.html
   └── GET /api/config → config.yaml as JSON
-  └── GET /media/... → video files from MEDIA_DIR
+  └── GET /api/file?path=<absolute> → streams file with Range + Content-Type
 ```
 
 - **server.js** — Express server: serves static files, config API, and media

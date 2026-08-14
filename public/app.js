@@ -404,20 +404,14 @@
   }
 
   /**
-   * Convert an absolute file path to a /media/... URL.
-   * The server mounts MEDIA_DIR at /media, so we strip the MEDIA_DIR prefix.
-   * If the path already starts with /media/, use as-is.
+   * Convert an absolute filesystem path to a server proxy URL.
+   * The server's /api/file endpoint streams the file with Range + Content-Type.
+   * Paths come from config (literal or expanded from videos_glob) and are used
+   * verbatim — there's no MEDIA_DIR indirection.
    */
   function toMediaUrl(filePath) {
     if (!filePath) return '';
-    if (filePath.startsWith('/media/')) {
-      // Already a URL path — use directly
-      return filePath;
-    }
-    // Assume it's an absolute path under the media directory;
-    // the server serves MEDIA_DIR at /media, so just prepend /media
-    // and let the user ensure paths are relative to MEDIA_DIR.
-    return '/media/' + filePath.replace(/^\/+/, '');
+    return '/api/file?path=' + encodeURIComponent(filePath);
   }
 
   /**
