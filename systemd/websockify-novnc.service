@@ -1,7 +1,15 @@
 [Unit]
 Description=websockify noVNC proxy for WindowPanes remote desktop pane
 Documentation=https://github.com/novnc/websockify
-After=network.target
+# Wait for the network to be fully routable before binding the listen port.
+# `network.target` fires as soon as the network stack is up — too early on
+# slow DHCP / wifi bring-up, where the interface may not yet have an IP and
+# the unit can race Firefox kiosk at boot, leaving the noVNC pane stuck on
+# "connecting…" until a manual restart. `network-online.target` is reached
+# only after routing is established; `Wants=` pulls it in if nothing else
+# already has.
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 # ── Configuration ────────────────────────────────────────────────────────────
