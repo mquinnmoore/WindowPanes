@@ -215,8 +215,14 @@ echo "  Config:    $CONFIG"
 node "$(dirname "$0")/server.js" &
 SERVER_PID=$!
 
-# Give the server a moment to start
-sleep 2
+# Give the server a moment to start.
+# 3s lets Node bind :3000 AND any locally-run websockify (dev setups where
+# the systemd unit is disabled) accept its first connection before the
+# Firefox kiosk starts loading iframes. Without this margin the noVNC pane
+# races the proxy at startup and gets stuck on "connecting…" until the
+# iframe is refreshed — see the recurring kiosk-mode hang fixed by this
+# branch.
+sleep 3
 
 # Open Firefox in kiosk mode
 URL="http://localhost:${PORT}"
